@@ -1,0 +1,93 @@
+import { runtimeEnvironmentValue } from "./runtime-env.ts";
+
+const encoder = new TextEncoder();
+
+async function digest(value: string) {
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", encoder.encode(value)));
+}
+
+function fixedLengthEqual(left: Uint8Array, right: Uint8Array) {
+  let difference = left.length ^ right.length;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) difference |= (left[index] || 0) ^ (right[index] || 0);
+  return difference === 0;
+}
+
+export async function hasValidInternalAuthorization(authorization: string | null, expectedOverride?: string) {
+  if (expectedOverride !== undefined) return hasValidBearerAuthorization(authorization, expectedOverride, 32);
+  const [expected, previous] = await Promise.all([
+    runtimeEnvironmentValue("MARKET_SIGNAL_CALLBACK_TOKEN"),
+    runtimeEnvironmentValue("MARKET_SIGNAL_CALLBACK_TOKEN_PREVIOUS"),
+  ]);
+  const [currentValid, previousValid] = await Promise.all([
+    hasValidBearerAuthorization(authorization, expected, 32),
+    hasValidBearerAuthorization(authorization, previous, 32),
+  ]);
+  return currentValid || previousValid;
+}
+
+export type AnalysisAuthorizationOverrides = { callback: string; api: string };
+
+export async function hasValidAnalysisAuthorization(authorization: string | null, overrides?: AnalysisAuthorizationOverrides) {
+  const [callback, api] = overrides
+    ? [overrides.callback, overrides.api]
+    : await Promise.all([
+      runtimeEnvironmentValue("MARKET_SIGNAL_CALLBACK_TOKEN"),
+      runtimeEnvironmentValue("MARKET_SIGNAL_API_TOKEN"),
+    ]);
+  const [callbackValid, apiValid] = await Promise.all([
+    hasValidBearerAuthorization(authorization, callback),
+    hasValidBearerAuthorization(authorization, api, 32),
+  ]);
+  return callbackValid || apiValid;
+}
+
+export async function hasValidApiAuthorization(authorization: string | null, expectedOverride?: string) {
+  const expected = expectedOverride === undefined
+    ? await runtimeEnvironmentValue("MARKET_SIGNAL_API_TOKEN")
+    : expectedOverride;
+  return hasValidBearerAuthorization(authorization, expected, 32);
+}
+
+export type OwnerAuthorizationOverrides = { read: string; write: string; callback: string };
+export type MonitorAuthorizationOverrides = { read: string; acknowledge: string; ownerRead: string; ownerWrite: string; callback: string };
+
+export async function hasValidOwnerAuthorization(authorization: string | null, purpose: "read" | "write", overrides?: OwnerAuthorizationOverrides) {
+  const [read, write, callback] = overrides
+    ? [overrides.read, overrides.write, overrides.callback]
+    : await Promise.all([
+      runtimeEnvironmentValue("MARKET_SIGNAL_OWNER_READ_TOKEN"),
+      runtimeEnvironmentValue("MARKET_SIGNAL_OWNER_WRITE_TOKEN"),
+      runtimeEnvironmentValue("MARKET_SIGNAL_CALLBACK_TOKEN"),
+    ]);
+  const credentials = [read, write, callback];
+  if (credentials.some((value) => value.length < 32 || /\s/.test(value)) || new Set(credentials).size !== credentials.length) return false;
+  return hasValidBearerAuthorization(authorization, purpose === "read" ? read : write, 32);
+}
+
+export async function hasValidMonitorAuthorization(authorization: string | null, purpose: "read" | "acknowledge", overrides?: MonitorAuthorizationOverrides) {
+  const [read, acknowledge, ownerRead, ownerWrite, callback] = overrides
+    ? [overrides.read, overrides.acknowledge, overrides.ownerRead, overrides.ownerWrite, overrides.callback]
+    : await Promise.all([
+      runtimeEnvironmentValue("MARKET_SIGNAL_MONITOR_READ_TOKEN"),
+      runtimeEnvironmentValue("MARKET_SIGNAL_MONITOR_ACK_TOKEN"),
+      runtimeEnvironmentValue("MARKET_SIGNAL_OWNER_READ_TOKEN"),
+      runtimeEnvironmentValue("MARKET_SIGNAL_OWNER_WRITE_TOKEN"),
+      runtimeEnvironmentValue("MARKET_SIGNAL_CALLBACK_TOKEN"),
+    ]);
+  const credentials = [read, acknowledge, ownerRead, ownerWrite, callback];
+  if (credentials.some((value) => value.length < 32 || /\s/.test(value)) || new Set(credentials).size !== credentials.length) return false;
+  return hasValidBearerAuthorization(authorization, purpose === "read" ? read : acknowledge, 32);
+}
+
+async function hasValidBearerAuthorization(authorization: string | null, expected: string, minimumLength = 1) {
+  const match = /^Bearer ([^\s]+)$/.exec(authorization || "");
+  const supplied = match?.[1] || "invalid-callback-credential";
+  const comparisonTarget = expected || "missing-server-callback-credential";
+  const [suppliedDigest, expectedDigest] = await Promise.all([digest(supplied), digest(comparisonTarget)]);
+  return Boolean(expected.length >= minimumLength && !/\s/.test(expected) && match && fixedLengthEqual(suppliedDigest, expectedDigest));
+}
+
+export function unauthorizedInternalResponse() {
+  return Response.json({ ok: false, error: "Unauthorized." }, { status: 401, headers: { "Cache-Control": "no-store" } });
+}

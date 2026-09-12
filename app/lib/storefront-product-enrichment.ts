@@ -1,0 +1,1402 @@
+import { canonicalDomain } from "./domain.ts";
+import { bilingualNormalize, bilingualTokens, parseCanonicalQuantity, quantitiesConflict } from "./product-normalization.ts";
+import { CATALOG_REPLACEMENT_ATTRIBUTE_PREFIX, catalogReplacementAuditAttribute, directProductMetadataOffer, directProductScopedMetadataOffer, extractProductsFromHtml, isSupportedCurrency, publicSourceMarketContext, publicSourceMarketEvidence, validateProductPageIdentity, type ProductEnrichmentTarget, type ProductPriceSignal, type ProductRecord } from "./product-intelligence.ts";
+import { redirectedMarketRetryUrl } from "./market-localization.ts";
+import { soleProductCurrencySelector } from "./product-currency-context.ts";
+import { confirmedProductCurrency, confirmedShopifyCartCurrency, confirmedShopifyRuntimeMarket, hasConflictingDirectProductCurrency, parseShopifyProduct, parseWooCommerceProduct, shopifyCartRequest, storefrontAdapterRequest } from "./product-page-adapters.ts";
+import { fetchPublicText } from "./public-fetch.ts";
+import { sharedRobotsPolicyResolver } from "./robots-policy.ts";
+import { stripInactiveHtmlMarkup } from "./active-html-markup.ts";
+import { MARKET_SIGNAL_USER_AGENT } from "./crawler-identity.ts";
+
+const MAX_DOCUMENT_BYTES = 1_500_000;
+export const MAX_ENRICHMENT_TARGETS = 64;
+const MAX_PER_DOMAIN_CONCURRENCY = 2;
+const REQUEST_TIMEOUT_MS = 8_000;
+const MAX_FETCH_ATTEMPTS = 2;
+const DEFAULT_RETRY_DELAY_MS = 250;
+const USER_AGENT = MARKET_SIGNAL_USER_AGENT;
+
+export type EnrichmentGap = {
+  url: string;
+  productId: string;
+  role: ProductEnrichmentTarget["role"];
+  reason: string;
+  code?: "robots_unreachable" | "robots_disallowed" | "fetch_failed" | "identity_mismatch" | "adapter_limited";
+  httpStatus?: number;
+  failureKind?: "robots" | "network" | "http" | "content" | "identity" | "adapter" | "redirect";
+  retryExhausted?: true;
+};
+
+export type ProductEnrichmentCoverage = {
+  pagesRequested: number;
+  pagesFetched: number;
+  maxPages: number;
+  gaps: EnrichmentGap[];
+};
+
+function text(value: unknown, limit: number) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, limit) : "";
+}
+
+function translatedMarketLanguage(expectedName: string, fetchedUrl: string) {
+  let redirectedLanguage = "";
+  try { redirectedLanguage = new URL(fetchedUrl).pathname.match(/^\/([a-z]{2,3})-[a-z]{2}\//i)?.[1]?.toLowerCase() || ""; } catch { return ""; }
+  const hasArabic = /\p{Script=Arabic}/u.test(expectedName);
+  const hasLatin = /\p{Script=Latin}/u.test(expectedName);
+  if (redirectedLanguage === "ar" && hasLatin && !hasArabic) return "en";
+  if (redirectedLanguage === "en" && hasArabic && !hasLatin) return "ar";
+  return "";
+}
+
+class ProductFetchFailure extends Error {
+  readonly failureKind: NonNullable<EnrichmentGap["failureKind"]>;
+
+  constructor(message: string, failureKind: NonNullable<EnrichmentGap["failureKind"]>) {
+    super(message);
+    this.name = "ProductFetchFailure";
+    this.failureKind = failureKind;
+  }
+}
+
+async function fetchSameDomain(
+  url: string,
+  domain: string,
+  accept: string,
+  fetchImpl?: typeof fetch,
+  waitForRetry?: (domain: string, milliseconds: number) => Promise<void>,
+) {
+  let retries = 0;
+  for (let attempt = 0; attempt < MAX_FETCH_ATTEMPTS; attempt += 1) {
+    const result = await fetchPublicText(url, accept, {
+      expectedDomain: domain,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      maxDocumentBytes: MAX_DOCUMENT_BYTES,
+      userAgent: USER_AGENT,
+      readErrorBody: false,
+      ...(fetchImpl ? { fetchImpl } : {}),
+    });
+    if (result.redirectDomain || /redirected off the submitted domain/i.test(result.error || "")) throw new ProductFetchFailure("redirected off the product domain", "redirect");
+    if (result.failureKind === "network" || result.failureKind === "timeout") throw new ProductFetchFailure(result.error || "network request failed", "network");
+    if (result.status === 0) throw new ProductFetchFailure(result.error || "response body could not be read", "network");
+    const retryable = [429, 502, 503, 504].includes(result.status);
+    if (!retryable || attempt === MAX_FETCH_ATTEMPTS - 1) {
+      return { ...result, retryExhausted: retryable && retries > 0 ? true as const : undefined };
+    }
+    retries += 1;
+    const retryAfterMs = "retryAfterMs" in result && typeof result.retryAfterMs === "number"
+      ? result.retryAfterMs
+      : DEFAULT_RETRY_DELAY_MS;
+    await (waitForRetry || (async (_domain, milliseconds) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds))))(domain, retryAfterMs);
+  }
+  throw new ProductFetchFailure("request retry state was invalid", "network");
+}
+
+function decode(value: string) {
+  return value.replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'").replace(/&pound;|&#163;/gi, "£").replace(/&euro;|&#8364;/gi, "€").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">");
+}
+
+function clean(value: string) {
+  return decode(value.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
+}
+
+function decodedCodePoint(value: string, radix: number) {
+  const code = Number.parseInt(value, radix);
+  return Number.isInteger(code) && code >= 0 && code <= 0x10FFFF ? String.fromCodePoint(code) : " ";
+}
+
+function decodeEvidence(value: string) {
+  return value
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&pound;|&#163;/gi, "\u00A3")
+    .replace(/&euro;|&#8364;/gi, "\u20AC")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&minus;/gi, "\u2212")
+    .replace(/&ndash;/gi, "\u2013")
+    .replace(/&mdash;/gi, "\u2014")
+    .replace(/&(?:hyphen|dash);/gi, "-")
+    .replace(/&ominus;/gi, "-")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&dollar;/gi, "$")
+    .replace(/&colon;/gi, ":")
+    .replace(/&equals;/gi, "=")
+    .replace(/&amp;/gi, "&")
+    .replace(/&#(\d+)(?:;|(?=\s|\p{Sc}))/gu, (_, code: string) => decodedCodePoint(code, 10))
+    .replace(/&#x([0-9a-f]+)(?:;|(?=\s|\p{Sc}))/giu, (_, code: string) => decodedCodePoint(code, 16));
+}
+
+function normalizeLocalizedNumbers(value: string) {
+  return value
+    .replace(/[\u0660-\u0669]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[\u06f0-\u06f9]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+    .replace(/\u066b/g, ".")
+    .replace(/\u066c/g, ",");
+}
+
+const CURRENCY_TOKENS: Record<string, string> = {
+  GBP: "(?:\\u00A3|\\bGBP\\b)",
+  EUR: "(?:\\u20AC|\\bEUR\\b)",
+  USD: "(?:\\$|\\bUSD\\b)",
+  KWD: "(?:\\bKWD\\b|(?<![\\u0600-\\u06FF])(?:ك\\s*\\.?\\s*د|د\\s*\\.?\\s*ك)(?![\\u0600-\\u06FF]))",
+  BHD: "(?:\\bBHD\\b|(?<![\\u0600-\\u06FF])(?:ب\\s*\\.?\\s*د|د\\s*\\.?\\s*ب)(?![\\u0600-\\u06FF]))",
+  OMR: "(?:\\bOMR\\b|(?<![\\u0600-\\u06FF])(?:ر\\s*\\.?\\s*ع|ع\\s*\\.?\\s*ر)(?![\\u0600-\\u06FF]))",
+  AED: "(?:\\bAED\\b|(?<![\\u0600-\\u06FF])(?:إ\\s*\\.?\\s*د|د\\s*\\.?\\s*إ)(?![\\u0600-\\u06FF]))",
+  SAR: "(?:\\bSAR\\b|\\bSR\\b|(?<![\\u0600-\\u06FF])(?:س\\s*\\.?\\s*ر|ر\\s*\\.?\\s*س)(?![\\u0600-\\u06FF]))",
+  QAR: "\\bQAR\\b",
+  CAD: "\\bCAD\\b",
+  AUD: "\\bAUD\\b",
+};
+const supportedCurrencyCodesPattern = Object.keys(CURRENCY_TOKENS).join("|");
+
+function localizedAmountPattern(currency: string, requireDecimals = false) {
+  const decimals = /^(?:KWD|BHD|OMR)$/.test(currency) ? 3 : 2;
+  const whole = "(?:[0-9]{1,3}(?:[.,'\\u00A0\\u202F ][0-9]{3})+|[0-9]{1,6})";
+  return `${whole}${requireDecimals ? `[.,][0-9]{1,${decimals}}` : `(?:[.,][0-9]{1,${decimals}})?`}`;
+}
+
+function currencyAmountExpression(currency: string) {
+  const amount = `(?<![\\d.,])${localizedAmountPattern(currency)}(?![\\d.,])`;
+  const token = CURRENCY_TOKENS[currency] || currency.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:${token})\\s*(${amount})|(${amount})\\s*(?:${token})`, "giu");
+}
+
+function currencyTokenExpression(currency: string) {
+  const token = CURRENCY_TOKENS[currency] || currency.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:${token})`, "giu");
+}
+
+function currencyRangeExpression(currency: string, requireCompleteSuffix = true) {
+  const token = CURRENCY_TOKENS[currency] || currency.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const amount = `[+-]?${localizedAmountPattern(currency)}(?![\\d.,])`;
+  const decimalAmount = `[+-]?${localizedAmountPattern(currency, true)}(?![\\d.,])`;
+  const completePriceSuffix = "(?=\\s*(?:$|[.,;)]\\s*$|\\/(?:month|mo|year|yr)\\b|per\\s+(?:month|year)\\b|(?:(?:incl|excl)(?:uding)?\\.?\\s+(?:tax|vat)|(?:tax|vat)\\s+(?:included|excluded)|each|per\\s+item)\\b\\s*[.,;)]?\\s*$))";
+  const ordinary = `(?:(?:${token})\\s*(${amount})\\s*(?:-|\\bto\\b)\\s*(${amount})|(${amount})\\s*(?:-|\\bto\\b)\\s*(${amount})\\s*(?:${token}))`;
+  const slash = `(?:(?:${token})\\s*(${decimalAmount})\\s*\\/\\s*(${decimalAmount})|(${decimalAmount})\\s*\\/\\s*(${decimalAmount})\\s*(?:${token}))`;
+  const suffix = requireCompleteSuffix ? completePriceSuffix : "(?=\\s*(?:$|[^\\p{L}%]))";
+  return new RegExp(`(?:${ordinary}|${slash})${suffix}`, "giu");
+}
+
+function localizedAmount(raw: string, currency: string) {
+  const decimals = /^(?:KWD|BHD|OMR)$/.test(currency) ? 3 : 2;
+  const compact = raw.replace(/[\s\u00A0\u202F']/gu, "");
+  const comma = compact.lastIndexOf(",");
+  const dot = compact.lastIndexOf(".");
+  if (comma >= 0 && dot >= 0) {
+    return Number(comma > dot ? compact.replace(/\./g, "").replace(",", ".") : compact.replace(/,/g, ""));
+  }
+  if (comma >= 0) {
+    const fractionLength = compact.length - comma - 1;
+    return Number(fractionLength > 0 && fractionLength <= decimals ? compact.replace(/,/g, ".") : compact.replace(/,/g, ""));
+  }
+  if (dot >= 0 && compact.length - dot - 1 === 3 && decimals < 3) return Number(compact.replace(/\./g, ""));
+  return Number(compact);
+}
+
+function isCompletePriceRangeSuffix(value: string) {
+  return /^\s*(?:|[.,;)]|\/(?:month|mo|year|yr)\b|per\s+(?:month|year)\b|(?:(?:incl|excl)(?:uding)?\.?\s+(?:tax|vat)|(?:tax|vat)\s+(?:included|excluded)|each|per\s+item)\b\s*[.,;)]?)\s*$/iu.test(value);
+}
+
+function currenciesFromMarkup(value: string) {
+  const decoded = normalizeLocalizedNumbers(decodeEvidence(value).replace(/<[^>]*>/g, " "));
+  return Object.keys(CURRENCY_TOKENS).filter((currency) => currencyAmountExpression(currency).test(decoded));
+}
+
+function publicImageFromScope(scope: string, sourceUrl: string) {
+  const tags = htmlTagSpans(scope).filter((tag) => !tag.closing && tag.name === "img");
+  const acceptedClasses = new Set(["wp-post-image", "woocommerce-product-gallery", "product-image", "product-media"]);
+  for (const tag of tags) {
+    const classes = htmlAttributeValue(tag.raw, "class")
+      .split(/\s+/)
+      .map((value) => value.toLowerCase().replace(/[_-]+/g, "-"));
+    if (classes.some((value) => /(?:^|-)(?:placeholder|skeleton|loading)(?:-|$)/u.test(value))) continue;
+    if (!classes.some((value) => [...acceptedClasses].some((token) => value === token || value.startsWith(`${token}-`)))) continue;
+    const raw = ["data-large_image", "data-lazy-src", "data-src", "src"]
+      .map((attribute) => htmlAttributeValue(tag.raw, attribute))
+      .find(Boolean) || "";
+    try {
+      const url = new URL(decodeEvidence(raw).replace(/^\/\//, "https://"), sourceUrl);
+      if (/^https:$/.test(url.protocol)) return url.toString();
+    } catch { /* Ignore malformed public markup. */ }
+  }
+  return "";
+}
+
+function productScope(document: string) {
+  const activeDocument = stripInactiveHtmlMarkup(document);
+  const title = activeDocument.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/i);
+  const summaryIndex = activeDocument.search(/class\s*=\s*["'][^"']*(?:summary|product-summary)[^"']*["']/i);
+  const start = Math.max(0, title?.index ?? summaryIndex);
+  const bounded = activeDocument.slice(start, Math.min(activeDocument.length, start + 160_000));
+  const marker = /(?:^|[\s_-])(?:related(?:[\s_-]+products?)?|upsells?|cross[\s_-]*sells?|recommend(?:ed|ations?)|product[\s_-]*recommendations?|you[\s_-]*(?:may|might)[\s_-]*also[\s_-]*(?:like|love)|similar[\s_-]*products?|frequently[\s_-]*bought[\s_-]*together|customers?[\s_-]*also[\s_-]*bought|people[\s_-]*also[\s_-]*bought|recently[\s_-]*viewed|pairs?[\s_-]*well[\s_-]*with|more[\s_-]*from[\s_-]*(?:our[\s_-]*)?collection|complete[\s_-]*the[\s_-]*look)(?:$|[\s_-])/i;
+  let relatedAt = -1;
+  for (const tag of bounded.matchAll(/<([a-z][\w:-]*)\b[^>]*>/gi)) {
+    const markup = tag[0];
+    const tagName = tag[1].replace(/:/g, "-");
+    const quoted = [...markup.matchAll(/(?:class|id)\s*=\s*(["'])(.*?)\1/gi)].map((match) => match[2]);
+    const unquoted = [...markup.matchAll(/(?:class|id)\s*=\s*([^\s>"']+)/gi)].map((match) => match[1]);
+    if (marker.test(tagName) || [...quoted, ...unquoted].some((value) => marker.test(value))) {
+      relatedAt = tag.index ?? -1;
+      break;
+    }
+  }
+  for (const heading of bounded.matchAll(/<h[2-4]\b[^>]*>([\s\S]*?)<\/h[2-4]>/gi)) {
+    const label = decodeEvidence(heading[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+    if (!marker.test(label)) continue;
+    const index = heading.index ?? -1;
+    if (index >= 0 && (relatedAt < 0 || index < relatedAt)) relatedAt = index;
+  }
+  return relatedAt >= 0 ? bounded.slice(0, relatedAt) : bounded;
+}
+
+function hasUrlMarketSelector(value: string) {
+  try {
+    const url = new URL(value);
+    const querySelected = [...url.searchParams.keys()].some((key) => /^(?:country|country_code|countrycode|market|region|locale|currency|currency_code|currencycode)$/i.test(key));
+    const market = publicSourceMarketEvidence(value);
+    return querySelected || market.explicit || market.conflict;
+  } catch { return false; }
+}
+
+function hasRegionalOrLanguagePathSelector(value: string) {
+  try {
+    const segments = new URL(value).pathname.split("/").filter(Boolean);
+    const routeIndex = segments.findIndex((segment) => /^(?:products?|shop)$/.test(segment.toLowerCase()));
+    return segments.slice(0, routeIndex >= 0 ? routeIndex : 0).some((segment) => /^[a-z]{2}(?:[-_][a-z]{2})?$/i.test(segment));
+  } catch { return false; }
+}
+
+// Locale-aware Shopify Ajax endpoints retain their presentment market. Only
+// accept an explicit language-country path when the active page runtime agrees
+// and the adapter response kept the exact same origin, locale and product path.
+// A URL alone (or an unscoped /cart.js response) is never currency evidence.
+function regionalShopifyCurrency(document: string, sourceUrl: string, adapterResponseUrl: string, expectedCountryCode: string, product?: ProductRecord) {
+  try {
+    const source = new URL(sourceUrl);
+    const response = new URL(adapterResponseUrl);
+    const expectedEndpoint = storefrontAdapterRequest(sourceUrl);
+    const country = source.pathname.match(/^\/[a-z]{2,3}-([a-z]{2})\/products\/[^/]+\/?$/i)?.[1]?.toUpperCase();
+    if (!country || expectedEndpoint?.kind !== "shopify") return "";
+    if ([...source.searchParams.keys(), ...response.searchParams.keys()].some(key => /^(?:country|country_code|countrycode|market|region|locale|currency|currency_code|currencycode)$/i.test(key))) return "";
+    if (response.origin !== source.origin || response.pathname !== new URL(expectedEndpoint.endpointUrl).pathname) return "";
+    const market = publicSourceMarketEvidence(sourceUrl);
+    const runtime = confirmedShopifyRuntimeMarket(document);
+    if (market.conflict || runtime?.countryCode !== country || (expectedCountryCode && country !== expectedCountryCode.toUpperCase())) return "";
+    const currency = confirmedAdapterCurrency(document, product, country);
+    return currency === runtime.currency ? currency : "";
+  } catch { return ""; }
+}
+
+function htmlTagSpans(value: string) {
+  const tags: Array<{ raw: string; index: number; end: number; name: string; closing: boolean; selfClosing: boolean }> = [];
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== "<") continue;
+    let quote = "";
+    let end = index + 1;
+    for (; end < value.length; end += 1) {
+      const char = value[end];
+      if (quote) {
+        if (char === quote) quote = "";
+      } else if (char === '"' || char === "'") {
+        quote = char;
+      } else if (char === ">") {
+        break;
+      }
+    }
+    if (end >= value.length) break;
+    const raw = value.slice(index, end + 1);
+    const identity = raw.match(/^<\s*(\/?)\s*([a-z][\w:-]*)/i);
+    if (identity) tags.push({ raw, index, end: end + 1, name: identity[2].toLowerCase(), closing: Boolean(identity[1]), selfClosing: /\/\s*>$/.test(raw) });
+    index = end;
+  }
+  return tags;
+}
+
+function htmlAttributeValue(tag: string, attributeName: string) {
+  const identity = tag.match(/^<\s*\/?\s*[a-z][\w:-]*/i);
+  let index = identity?.[0].length ?? tag.length;
+  while (index < tag.length) {
+    while (/\s/u.test(tag[index] || "")) index += 1;
+    if (tag[index] === ">" || tag[index] === "/") break;
+    const nameStart = index;
+    while (index < tag.length && !/[\s=>/]/u.test(tag[index])) index += 1;
+    const name = tag.slice(nameStart, index).toLowerCase();
+    while (/\s/u.test(tag[index] || "")) index += 1;
+    if (tag[index] !== "=") continue;
+    index += 1;
+    while (/\s/u.test(tag[index] || "")) index += 1;
+    const quote = tag[index] === '"' || tag[index] === "'" ? tag[index++] : "";
+    const valueStart = index;
+    if (quote) {
+      while (index < tag.length && tag[index] !== quote) index += 1;
+    } else {
+      while (index < tag.length && !/[\s>]/u.test(tag[index])) index += 1;
+    }
+    const value = tag.slice(valueStart, index);
+    if (quote && tag[index] === quote) index += 1;
+    if (name === attributeName.toLowerCase()) return value;
+  }
+  return "";
+}
+
+function isSelectedProductDetailPage(value: string) {
+  try {
+    const path = decodeURIComponent(new URL(value).pathname).replace(/\/+$/, "");
+    if (!path || path === "/" || /\/(?:collections?|catalog)(?:\/|$)/i.test(path)) return false;
+    if (/\/(?:products?|shop|store)\//i.test(path)) return true;
+    const segments = path.split("/").filter(Boolean);
+    const tail = segments.at(-1) || "";
+    if (!/\.(?:html?|aspx?)$/i.test(tail)) return false;
+    if (!segments.slice(0, -1).every((segment) => /^[a-z]{2,3}(?:-[a-z]{2})?$/i.test(segment))) return false;
+    const stem = tail.replace(/\.(?:html?|aspx?)$/i, "");
+    return !/^(?:search(?:[-_]?results?)?|results?|listing|list|product[-_]?list|browse|catalog|collections?|categories?|index|all)(?:[-_].*)?$/i.test(stem);
+  } catch {
+    return false;
+  }
+}
+
+function embeddedProductAnalyticsRecord(
+  document: string,
+  sourceUrl: string,
+  domain: string,
+  productId: string,
+  observedAt: string,
+): ProductRecord | null {
+  if (!isSelectedProductDetailPage(sourceUrl)) return null;
+  const tags = htmlTagSpans(document).filter((tag) => !tag.closing);
+  const actions = tags.flatMap((tag) => {
+    const raw = htmlAttributeValue(tag.raw, "data-ga-ec-action");
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(decodeEvidence(raw));
+      if (!parsed || parsed["ga-type"] !== "addProduct" || !parsed.data || typeof parsed.data !== "object") return [];
+      const name = text(parsed.data.name, 300);
+      const reference = text(parsed.data.id, 160);
+      const amount = parsed.data.price;
+      if (!name || !reference || typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) return [];
+      return [{
+        name,
+        reference,
+        amount,
+        category: text(parsed.data.category, 200),
+        brand: text(parsed.data.brand, 160),
+        currency: text(parsed.data.currency, 3).toUpperCase(),
+      }];
+    } catch {
+      return [];
+    }
+  });
+  if (actions.length !== 1) return null;
+  if (actions[0].currency && !isSupportedCurrency(actions[0].currency)) return null;
+
+  const settingsCurrencies = tags.flatMap((tag) => {
+    const raw = htmlAttributeValue(tag.raw, "data-settings");
+    if (!raw) return [];
+    const decoded = decodeEvidence(raw);
+    return [...decoded.matchAll(/"currency"\s*:\s*"([A-Za-z]{3})"/g)]
+      .map((match) => match[1].toUpperCase())
+      .filter(isSupportedCurrency);
+  });
+  const currencies = [...new Set([actions[0].currency, ...settingsCurrencies].filter(isSupportedCurrency))];
+  if (currencies.length !== 1) return null;
+  const currency = currencies[0];
+  const action = actions[0];
+  return {
+    id: productId,
+    domain: canonicalDomain(domain),
+    name: action.name,
+    normalizedName: bilingualNormalize(action.name),
+    description: "",
+    category: action.category || "product",
+    jsonLdType: "Product",
+    priceSignals: [{ raw: `${currency} ${action.amount}`, currency, amount: action.amount }],
+    attributes: [
+      "Price evidence: product-bound analytics",
+      ...(action.brand ? [`Brand: ${action.brand}`] : []),
+      `Product reference: ${action.reference}`,
+    ],
+    ownership: "path-inferred",
+    extraction: "page-signal",
+    confidence: "High",
+    sourceUrl,
+    imageUrl: publicImageFromScope(document, sourceUrl),
+    observedAt,
+    claimIds: [`${productId}-product-analytics-price`],
+    quantity: parseCanonicalQuantity(action.name) || undefined,
+  };
+}
+
+const unitPriceClassTokens = new Set(["unit-price", "unitprice", "price-per-unit", "price-unit", "price-per-measure"]);
+const secondaryPriceClassTokens = new Set(["compare-at", "old-price", "list-price", "regular-price", "price-regular", "member-price", "loyalty-price", "deposit-price", "saving", "savings", "discount"]);
+
+function isUnitPriceClassToken(value: string) {
+  return unitPriceClassTokens.has(value)
+    || (/(?:^|-)price(?:-|$)/u.test(value) && /(?:^|-)(?:unit|measure)(?:-|$)/u.test(value));
+}
+
+function hasIncentiveLabel(value: string) {
+  const normalized = value
+    .replace(/([\p{Ll}])([\p{Lu}])/gu, "$1 $2")
+    .replace(/[_-]+/g, " ");
+  return /\b(?:(?:e\s*)?gift\s*(?:card|certificate)|voucher|promo(?:tional)?\s+code|promotional\s+credit|store\s*credit)\b/iu.test(normalized);
+}
+
+function hasRecurringPriceLead(value: string) {
+  const recurringAt = value.search(/\b(?:pay\s+(?:(?:per|a|every|each)\s+)?(?:(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|other)\s+)?(?:day|week|wk|fortnight|fortnightly|month|mo|quarter|qtr|year|yr)s?|(?:once|twice)\s+(?:a|per)\s+(?:day|week|wk|fortnight|month|mo|quarter|qtr|year|yr)|(?:every|each)\s+(?:(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|other)\s+)?(?:day|week|wk|fortnight|month|mo|quarter|qtr|year|yr)s?|per\s+(?:day|week|wk|fortnight|month|mo|quarter|qtr|year|yr)s?|(?:per|every|each)\s+billing\s+cycles?|daily|weekly|bi[- ]?weekly|fortnightly|monthly|quarterly|yearly|annually)\b/iu);
+  const amountAt = value.search(new RegExp(`(?:[$€£¥₹]\\s*[+-]?\\d|\\b(?:${supportedCurrencyCodesPattern})\\s*[+-]?\\d|[+-]?\\d[\\d\\s.,']*\\s+(?:${supportedCurrencyCodesPattern})\\b)`, "u"));
+  return recurringAt >= 0 && (amountAt < 0 || recurringAt < amountAt);
+}
+
+function elementMarkupByClassTokens(
+  scope: string,
+  allowedTags: ReadonlySet<string>,
+  accepted: ReadonlySet<string>,
+  rejected = new Set<string>(),
+  rejectMarkup: (markup: string) => boolean = () => false,
+) {
+  const tags = htmlTagSpans(scope);
+  for (let index = 0; index < tags.length; index += 1) {
+    const opening = tags[index];
+    if (opening.closing || !allowedTags.has(opening.name)) continue;
+    const classes = htmlAttributeValue(opening.raw, "class")
+      .split(/\s+/)
+      .map((value) => value.toLowerCase().replace(/[_-]+/g, "-"));
+    const hasRejectedClass = classes.some((value) => [...rejected].some((token) => value === token || value.startsWith(`${token}-`))
+      || (rejected === unitPriceClassTokens && isUnitPriceClassToken(value)));
+    if (!classes.some((value) => accepted.has(value)) || hasRejectedClass) continue;
+    const start = opening.index;
+    let depth = 0;
+    for (const elementTag of tags.slice(index)) {
+      if (elementTag.name !== opening.name) continue;
+      depth += elementTag.closing ? -1 : elementTag.selfClosing ? 0 : 1;
+      if (depth !== 0) continue;
+      const markup = scope.slice(start, elementTag.end);
+      if (rejectMarkup(markup)) break;
+      return markup;
+    }
+  }
+  return "";
+}
+
+function isSecondaryPriceMarkup(markup: string) {
+  const hasNestedSecondaryElement = htmlTagSpans(markup).slice(1).some((tag) => {
+    if (tag.closing) return false;
+    const classes = htmlAttributeValue(tag.raw, "class")
+      .split(/\s+/)
+      .map((value) => value.toLowerCase().replace(/[_-]+/g, "-"));
+    return classes.some((value) => secondaryPriceClassTokens.has(value));
+  });
+  if (hasNestedSecondaryElement) return false;
+  const text = decodeEvidence(markup).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  if (hasIncentiveLabel(text)) return true;
+  if (hasRecurringPriceLead(text)) return true;
+  if (/\b(?:now|sale|current)\b/iu.test(text)) return false;
+  return /^(?:compare\s+at|was|regular(?:\s+price)?|list\s+price|msrp|rrp|original(?:\s+price)?|retail(?:\s+price)?|deposit|down\s+payment|due\s+today|as\s+low\s+as|financ(?:e|ing)|lease|payment\s+plan|save\b|discount|instant\s+savings?|saving|savings|rebate|cash\s*back|cashback|store\s+credit|coupon|rewards?)/iu.test(text);
+}
+
+function preferredCurrentPriceMarkup(scope: string) {
+  return elementMarkupByClassTokens(
+    scope,
+    new Set(["div", "span"]),
+    new Set(["product-price-sale", "sale-price", "current-price", "price-current"]),
+    unitPriceClassTokens,
+    isSecondaryPriceMarkup,
+  );
+}
+
+function removeSecondaryPriceElements(markup: string) {
+  const tags = htmlTagSpans(markup);
+  const ranges: Array<[number, number]> = [];
+  for (let index = 0; index < tags.length; index += 1) {
+    const opening = tags[index];
+    if (opening.closing) continue;
+    const classes = htmlAttributeValue(opening.raw, "class")
+      .split(/\s+/)
+      .map((value) => value.toLowerCase().replace(/[_-]+/g, "-"));
+    if (!classes.some((value) => secondaryPriceClassTokens.has(value))) continue;
+    let depth = 0;
+    for (const closing of tags.slice(index)) {
+      if (closing.name !== opening.name) continue;
+      depth += closing.closing ? -1 : closing.selfClosing ? 0 : 1;
+      if (depth !== 0) continue;
+      ranges.push([opening.index, closing.end]);
+      break;
+    }
+  }
+  const merged = ranges.sort((left, right) => left[0] - right[0]).reduce<Array<[number, number]>>((result, range) => {
+    const previous = result.at(-1);
+    if (!previous || range[0] > previous[1]) result.push([...range]);
+    else previous[1] = Math.max(previous[1], range[1]);
+    return result;
+  }, []);
+  return merged.reverse().reduce((value, [start, end]) => `${value.slice(0, start)} ${value.slice(end)}`, markup);
+}
+
+function scopedPriceSignals(currency: string, values: number[]) {
+  if (!currency) return [];
+  return [...new Set(values.filter((amount) => Number.isFinite(amount) && amount > 0))]
+    .sort((left, right) => left - right)
+    .map((amount) => ({ raw: `${currency} ${amount}`, currency, amount }));
+}
+
+function withExplicitListContext(signals: ProductPriceSignal[], currency: string, listMarkup: string) {
+  if (signals.length !== 1 || !listMarkup || !currency) return signals;
+  const listAmounts = markedAmounts(listMarkup, currency);
+  if (listAmounts.length !== 1 || listAmounts[0] <= Number(signals[0].amount || 0)) return signals;
+  return [{ ...signals[0], listAmount: listAmounts[0], listRaw: `${currency} ${listAmounts[0]}` }];
+}
+
+function isRecurringPriceSuffix(value: string) {
+  const normalized = value.trim().replace(/^(?:(?:[-:;,—–]|\()\s*)+/u, "");
+  if (/^(?:billed|charged|paid|payable|due|payments?)\b[\p{L}\p{N}\s'/-]{0,80}\b(?:day|daily|week|weekly|bi[- ]?weekly|wk|fortnight|fortnightly|month|monthly|mo|quarter|quarterly|qtr|year|yearly|annual|annually|yr)s?\b/iu.test(normalized)) return true;
+  if (/^(?:on|for|at)\b[\p{L}\p{N}\s'/-]{0,80}\b(?:day|daily|week|weekly|bi[- ]?weekly|wk|fortnight|fortnightly|month|monthly|mo|quarter|quarterly|qtr|year|yearly|annual|annually|yr)s?\b/iu.test(normalized)) return true;
+  return /^(?:(?:(?:\/\s*|per\s+|a\s+|(?:once|twice)\s+(?:a|per)\s+|(?:billed|charged|paid|payable|due)\s+(?:(?:per|a)\s+|(?:once|twice)\s+(?:a|per)\s+|(?:every|each)\s+(?:(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|other)\s+)?)?|(?:every|each)\s+(?:(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|other)\s+)?)?(?:day|daily|week|weekly|bi[- ]?weekly|wk|fortnight|fortnightly|month|monthly|mo|quarter|quarterly|qtr|year|yearly|annual|annually|yr)s?|(?:\/\s*|per\s+|every\s+|each\s+|(?:once|twice)\s+(?:a|per)\s+)billing\s+cycles?))\b/iu.test(normalized);
+}
+
+function markedAmounts(markup: string, currency: string) {
+  const withoutSecondaryPrices = removeSecondaryPriceElements(markup)
+    .replace(/<(s|del)\b[^>]*>[\s\S]*?<\/\1\s*>/giu, " ")
+    .replace(/<(span|div|small|em|strong)\b[^>]*\sstyle\s*=\s*["'][^"']*text-decoration(?:-line)?\s*:\s*line-through[^"']*["'][^>]*>[\s\S]*?<\/\1\s*>/giu, " ")
+    .replace(/<(span|div|small|em|strong)\b[^>]*>[\s\S]*?\b(?:save|saving|savings|discount|compare\s+at|was|off)\b[\s\S]*?<\/\1\s*>/giu, " ");
+  const decoded = normalizeLocalizedNumbers(decodeEvidence(withoutSecondaryPrices.replace(/<[^>]*>/g, " ")))
+    .replace(/\b(?:save|saving|savings|discount|was|compare\s+at)\b[\s\S]*?\b(now|current(?:\s+price)?)\b/giu, "$1")
+    .replace(/\b(?:regular|list|original|was)\b[\s\S]*?\b(sale|now|current(?:\s+price)?)\b/giu, "$1")
+    .replace(/[\p{Pd}\u207B\u208B\u2212\u2213\u2238\u2296\u229D\u229F\u2796\u2A29-\u2A2C\u2A3A\u2A41\u2A6C]/gu, "-");
+  if (/&#(?:x[0-9a-f]+|\d+)/i.test(decoded)) return [];
+  const expression = currencyAmountExpression(currency);
+  const installmentAt = decoded.search(/\b(?:payments?|instal+ments?|pay\s+in|payment\s+plan|instal+ment\s+plan)\b/iu);
+  const observedAmounts = [...decoded.matchAll(expression)];
+  const firstObservedAmount = observedAmounts[0];
+  if (installmentAt >= 0 && (!firstObservedAmount || installmentAt < (firstObservedAmount.index ?? 0))) return [];
+  if (installmentAt >= 0 && firstObservedAmount) {
+    const firstEnd = (firstObservedAmount.index ?? 0) + firstObservedAmount[0].length;
+    const beforeInstallment = decoded.slice(firstEnd, installmentAt);
+    if (/^\s*(?:down|initial|first|monthly|weekly|biweekly)\s*$/iu.test(beforeInstallment)
+      || isRecurringPriceSuffix(beforeInstallment)) return [];
+  }
+  let priceText = decoded;
+  if (installmentAt >= 0 && firstObservedAmount) {
+    const firstEnd = (firstObservedAmount.index ?? 0) + firstObservedAmount[0].length;
+    const beforeInstallment = decoded.slice(0, installmentAt);
+    const financingLead = beforeInstallment.match(/(?:\b(?:or|with)\b[\s\S]*|(?:[-,;]|\s)\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve)\s+(?:(?:interest[- ]free|easy|monthly|weekly|biweekly)\s*)*)$/iu);
+    const financingStart = financingLead ? beforeInstallment.length - financingLead[0].length : installmentAt;
+    const productPrefix = decoded.slice(0, financingStart).trimEnd();
+    const prefixAmounts = [...productPrefix.matchAll(expression)];
+    const secondObservedAmount = prefixAmounts[1];
+    const between = secondObservedAmount
+      ? decoded.slice((firstObservedAmount.index ?? 0) + firstObservedAmount[0].length, secondObservedAmount.index ?? 0)
+      : "";
+    const secondEnd = secondObservedAmount ? (secondObservedAmount.index ?? 0) + secondObservedAmount[0].length : 0;
+    const hasExplicitTokenRange = Boolean(secondObservedAmount
+      && /^\s*(?:-|\/|to)\s*$/iu.test(between)
+      && isCompletePriceRangeSuffix(productPrefix.slice(secondEnd)));
+    const sharedCurrencyRange = [...productPrefix.matchAll(currencyRangeExpression(currency))][0];
+    if (hasExplicitTokenRange) {
+      priceText = productPrefix.slice(0, (secondObservedAmount!.index ?? 0) + secondObservedAmount![0].length);
+    } else if (sharedCurrencyRange) {
+      priceText = productPrefix.slice(0, (sharedCurrencyRange.index ?? 0) + sharedCurrencyRange[0].length);
+    } else {
+      priceText = decoded.slice(0, firstEnd);
+    }
+  }
+  const matches = [...priceText.matchAll(expression)];
+  const tokenCount = [...priceText.matchAll(currencyTokenExpression(currency))].length;
+  if (matches.length === 0 || matches.length !== tokenCount) return [];
+  if (matches.length === 1) {
+    const before = priceText.slice(0, matches[0].index ?? 0).trim();
+    const after = priceText.slice((matches[0].index ?? 0) + matches[0][0].length).trim();
+    if (/\bsave\b[\s\S]*$/iu.test(before)
+      || hasIncentiveLabel(before)
+      || hasRecurringPriceLead(before)
+      || /\b(?:compare\s+at|regular\s+price|list\s+price|msrp|rrp|original\s+price|retail\s+price|deposit|down\s+payment|due\s+today|as\s+low\s+as|financ(?:e|ing)|lease|payment\s+plan|discount|instant\s+savings?|saving|savings|rebate|cash\s*back|cashback|store\s+credit|coupon|rewards?)\b[\s\S]*$/iu.test(before)
+      || /^(?:(?:[\p{L}-]+\s+){0,3})?(?:off|deposit|down\s+payment|due\s+today|discount|instant\s+savings?|saving|savings|rebate|cash\s*back|cashback|back|store\s+credit|gift\s+card|credit|coupon|rewards?\s+points?|points?)\b/iu.test(after)
+      || (after.length <= 80 && hasIncentiveLabel(after))
+      || isRecurringPriceSuffix(after)) return [];
+  }
+  const validContexts = matches.every((match) => {
+      const start = match.index ?? 0;
+      const before = priceText.slice(0, start);
+      const after = priceText.slice(start + match[0].length);
+      const trimmedBefore = before.trimEnd();
+      const signPrefix = trimmedBefore.endsWith("-") ? trimmedBefore.slice(0, -1).trimEnd() : null;
+      const negativePrefix = signPrefix !== null && (!signPrefix || /[:=]\s*$/u.test(signPrefix));
+      return !negativePrefix
+        && !/\(\s*$/u.test(before)
+        && !/^\s*\)/u.test(after)
+        && !/^\s*-\s*$/u.test(after);
+    });
+  if (!validContexts) return [];
+  const amounts = matches.map((match) => localizedAmount(match[1] || match[2], currency));
+  const rangeAmounts: number[] = [];
+  for (const range of priceText.matchAll(currencyRangeExpression(currency))) {
+    const rangeStart = range.index ?? -1;
+    const rangeEnd = rangeStart + range[0].length;
+    const firstMatchStart = matches[0].index ?? -2;
+    const firstMatchEnd = firstMatchStart + matches[0][0].length;
+    if (rangeStart !== firstMatchStart && !(rangeStart < firstMatchStart && rangeEnd >= firstMatchEnd)) continue;
+    const endpoints = [localizedAmount(range[1] || range[3] || range[5] || range[7], currency), localizedAmount(range[2] || range[4] || range[6] || range[8], currency)];
+    rangeAmounts.push(...endpoints);
+  }
+  if (rangeAmounts.length) return rangeAmounts.every((amount) => Number.isFinite(amount) && amount > 0) ? rangeAmounts : [];
+  if (matches.length > 1) {
+    const firstEnd = (matches[0].index ?? 0) + matches[0][0].length;
+    const secondStart = matches[1].index ?? 0;
+    const secondEnd = secondStart + matches[1][0].length;
+    const explicitRange = /^\s*(?:-|\/|to)\s*$/iu.test(priceText.slice(firstEnd, secondStart))
+      && isCompletePriceRangeSuffix(priceText.slice(secondEnd));
+    return explicitRange && amounts.slice(0, 2).every((amount) => Number.isFinite(amount) && amount > 0)
+      ? amounts.slice(0, 2)
+      : [];
+  }
+  return amounts.every((amount) => Number.isFinite(amount) && amount > 0) ? amounts : [];
+}
+
+export function extractScopedProductPageEvidence(document: string, sourceUrl = "https://product.invalid/") {
+  const scope = productScope(document);
+  const priceMarkup = preferredCurrentPriceMarkup(scope)
+    || elementMarkupByClassTokens(
+      scope,
+      new Set(["p"]),
+      new Set(["price"]),
+      unitPriceClassTokens,
+      isSecondaryPriceMarkup,
+    )
+    || elementMarkupByClassTokens(scope, new Set(["div", "span"]), new Set(["product-price", "single-product-price"]), unitPriceClassTokens, isSecondaryPriceMarkup)
+    || "";
+  const currentMarkup = priceMarkup.match(/<ins\b[^>]*>([\s\S]*?)<\/ins>/i)?.[1]
+    || priceMarkup.replace(/<del\b[^>]*>[\s\S]*?<\/del>/gi, " ");
+  const explicitListMarkup = priceMarkup.match(/<(?:del|s)\b[^>]*>([\s\S]*?)<\/(?:del|s)\s*>/i)?.[1] || "";
+  // Some Shopify themes render decimal cents as an unclosed superscript,
+  // for example `£20<sup>25 </span>`. Preserve that first-party visible
+  // amount before stripping markup so it can agree with product metadata and
+  // the identity-gated Shopify JSON payload instead of becoming a false £20.
+  const normalizedCurrentMarkup = currentMarkup.replace(
+    /((?:\p{Sc}|[A-Z]{3})\s*[+-]?\d{1,9}(?:[,.]\d{3})*)\s*<sup\b[^>]*>\s*(\d{2})(?=\s*(?:<\/sup\s*>)?)/giu,
+    "$1.$2",
+  );
+  const decodedPriceMarkup = normalizeLocalizedNumbers(decodeEvidence(normalizedCurrentMarkup).replace(/<[^>]*>/g, " "));
+  const markedCurrencies = currenciesFromMarkup(currentMarkup);
+  const directCurrency = confirmedProductCurrency(document, { allowStructured: false });
+  const hasDollarSymbol = /\$/.test(decodedPriceMarkup);
+  const hasAmbiguousCordobaMarker = /(?:C\$|\bC\s+\$)\s*[+-]?\d/iu.test(decodedPriceMarkup)
+    && !/\b(?:vitamin|grade|type|model|size|option|plan)\s+C\s+\$\s*[+-]?\d/iu.test(decodedPriceMarkup);
+  const dollarCurrencies = new Set([
+    "ARS", "AUD", "BMD", "BND", "BRL", "BSD", "BZD", "CAD", "CLP", "COP", "DOP", "FJD", "GYD", "HKD", "JMD",
+    "KYD", "LRD", "MXN", "NAD", "NIO", "NZD", "SBD", "SGD", "SRD", "TTD", "TWD", "USD", "XCD", "ZWL",
+  ]);
+  const qualifiedDollarMarkers: ReadonlyArray<[currency: string, marker: RegExp]> = [
+    ["USD", /(?:^|[^\p{L}\p{N}])US\s*\$\s*[+-]?\d/iu],
+    ["CAD", /(?:^|[^\p{L}\p{N}])CA\s*\$\s*[+-]?\d/iu],
+    ["AUD", /(?:^|[^\p{L}\p{N}])(?:AU\s*\$|A\$)\s*[+-]?\d/iu],
+    ["BRL", /(?:^|[^\p{L}\p{N}])R\$\s*[+-]?\d/iu],
+    ["DOP", /(?:^|[^\p{L}\p{N}])RD\s*\$\s*[+-]?\d/iu],
+    ["HKD", /(?:^|[^\p{L}\p{N}])HK\s*\$\s*[+-]?\d/iu],
+    ["MXN", /(?:^|[^\p{L}\p{N}])MX\s*\$\s*[+-]?\d/iu],
+    ["NZD", /(?:^|[^\p{L}\p{N}])NZ\s*\$\s*[+-]?\d/iu],
+    ["SGD", /(?:^|[^\p{L}\p{N}])S\$\s*[+-]?\d/iu],
+    ["TWD", /(?:^|[^\p{L}\p{N}])NT\s*\$\s*[+-]?\d/iu],
+  ];
+  const qualifiedDollarCurrencies = qualifiedDollarMarkers
+    .filter(([, marker]) => marker.test(decodedPriceMarkup))
+    .map(([currency]) => currency);
+  const explicitPriceCurrencies = [...decodedPriceMarkup.matchAll(/\b[A-Za-z]{3}\b/g)]
+    .filter((match) => {
+      const index = match.index ?? 0;
+      return /^\s*(?:\p{Sc}\s*)?[+-]?\d/u.test(decodedPriceMarkup.slice(index + match[0].length))
+        || /\d(?:[.,]\d+)?\s*$/.test(decodedPriceMarkup.slice(0, index));
+    })
+    .map((match) => match[0].toUpperCase())
+    .filter(isSupportedCurrency);
+  const nonDollarMarkedCurrencies = markedCurrencies.filter((currency) => currency !== "USD" || !hasDollarSymbol || /\bUSD\b/i.test(decodedPriceMarkup));
+  const observedPriceCurrencies = [...new Set([...explicitPriceCurrencies, ...nonDollarMarkedCurrencies, ...qualifiedDollarCurrencies])];
+  const directConflict = Boolean(directCurrency && (
+    observedPriceCurrencies.some((currency) => currency !== directCurrency)
+    || (hasAmbiguousCordobaMarker && !new Set(["CAD", "NIO"]).has(directCurrency))
+  ));
+  const observedCurrency = directConflict
+    ? ""
+    : directCurrency && hasDollarSymbol && dollarCurrencies.has(directCurrency)
+    ? directCurrency
+    : directCurrency && observedPriceCurrencies.length > 0 && !observedPriceCurrencies.includes(directCurrency)
+      ? ""
+      : observedPriceCurrencies.length === 1 && !(hasDollarSymbol && !/\bUSD\b/i.test(decodedPriceMarkup) && !directCurrency)
+        ? observedPriceCurrencies[0]
+        : observedPriceCurrencies.length > 1
+          ? ""
+          : directCurrency;
+  const currency = isSupportedCurrency(observedCurrency) ? observedCurrency.trim().toUpperCase() : "";
+  const variationAttributeMatch = scope.match(/\bdata-product_variations(?:\s*=\s*(?:"([\s\S]*?)"|'([\s\S]*?)'|([^\s>]+)))?/i);
+  const variationAttribute = variationAttributeMatch ? (variationAttributeMatch[1] ?? variationAttributeMatch[2] ?? variationAttributeMatch[3] ?? "") : "";
+  if (variationAttributeMatch && currency) {
+    if (!variationAttribute) return { priceSignals: [], basis: "unavailable" as const, imageUrl: publicImageFromScope(scope, sourceUrl) };
+    try {
+      const variations = JSON.parse(decodeEvidence(variationAttribute));
+      if (!Array.isArray(variations) || !variations.length) {
+        return { priceSignals: [], basis: "unavailable" as const, imageUrl: publicImageFromScope(scope, sourceUrl) };
+      }
+      const rawAmounts = variations.map((variation) => variation?.display_price);
+      if (rawAmounts.some((amount) => typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0)) return { priceSignals: [], basis: "unavailable" as const, imageUrl: publicImageFromScope(scope, sourceUrl) };
+      const amounts = rawAmounts;
+      const signals = scopedPriceSignals(currency, amounts);
+      if (signals.length) return { priceSignals: signals, basis: signals.length > 1 ? "range" as const : "point" as const, imageUrl: publicImageFromScope(scope, sourceUrl) };
+    } catch { return { priceSignals: [], basis: "unavailable" as const, imageUrl: publicImageFromScope(scope, sourceUrl) }; }
+  }
+
+  const comparableMarkup = directCurrency && hasDollarSymbol && dollarCurrencies.has(directCurrency)
+    ? normalizedCurrentMarkup
+      .replace(/\b(?:US|CA|C|AU|A|RD|R|HK|MX|NZ|S|NT)\s*\$/gi, `${directCurrency} `)
+      .replace(/\$/g, `${directCurrency} `)
+    : normalizedCurrentMarkup;
+  const signals = withExplicitListContext(scopedPriceSignals(currency, markedAmounts(comparableMarkup, currency)), currency, explicitListMarkup);
+  return {
+    priceSignals: signals,
+    basis: signals.length > 1 ? "range" as const : signals.length === 1 ? (/<ins\b/i.test(priceMarkup) ? "sale" as const : "point" as const) : "unavailable" as const,
+    imageUrl: publicImageFromScope(scope, sourceUrl),
+  };
+}
+
+function addScopedProductPageEvidence(document: string, sourceUrl: string, expected: ProductRecord, products: ProductRecord[], pageTitle: string) {
+  const evidence = extractScopedProductPageEvidence(document, sourceUrl);
+  const directOffer = directProductMetadataOffer(document);
+  if (!evidence.priceSignals.length && !evidence.imageUrl && !directOffer) return;
+  const detailProductPage = isSelectedProductDetailPage(sourceUrl);
+  // Visible summary markup is only page-scoped. On collections it can belong
+  // to any sibling card, so only product-bound structured evidence may survive.
+  if (!detailProductPage) return;
+  const identity = validateProductPageIdentity([expected], products, pageTitle, { allowScopedPageSignal: true });
+  if (!identity.accepted) return;
+  const selected = identity.products[0];
+  const selectedPositive = withPositivePrices(selected);
+  const directSignals = directOffer && typeof directOffer.amount === "number" && Number.isFinite(directOffer.amount) && directOffer.amount > 0
+    ? [directOffer]
+    : [];
+  const selectedCurrencies = new Set(selectedPositive.priceSignals.map((signal) => String(signal.currency || "").trim().toUpperCase()).filter(Boolean));
+  const evidenceCurrencies = new Set(evidence.priceSignals.map((signal) => String(signal.currency || "").trim().toUpperCase()).filter(Boolean));
+  const currencyMismatch = selectedCurrencies.size > 0 && evidenceCurrencies.size > 0
+    && [...selectedCurrencies].some((currency) => !evidenceCurrencies.has(currency));
+  const directCurrency = confirmedProductCurrency(document, { allowStructured: false });
+  const directSupportsVisible = directCurrency && evidenceCurrencies.size === 1 && evidenceCurrencies.has(directCurrency);
+  const directSupportsSelected = directCurrency && selectedCurrencies.size === 1 && selectedCurrencies.has(directCurrency);
+  const directVisibleConflict = directSignals.length > 0 && evidence.priceSignals.length > 0 && !priceSignalsAgree(directSignals, evidence.priceSignals);
+  const selectedVisibleConflict = selectedPositive.priceSignals.length > 0 && evidence.priceSignals.length > 0 && !priceSignalsAgree(selectedPositive.priceSignals, evidence.priceSignals);
+  const directSelectedConflict = directSignals.length > 0 && selectedPositive.priceSignals.length > 0 && !priceSignalsAgree(directSignals, selectedPositive.priceSignals);
+  const corroboratedDirectVisible = priceSignalsAgree(directSignals, evidence.priceSignals);
+  const amountConflict = directVisibleConflict || (!corroboratedDirectVisible && (selectedVisibleConflict || directSelectedConflict));
+  const priceSignals = amountConflict
+    ? []
+    : corroboratedDirectVisible
+      ? evidence.priceSignals
+      : currencyMismatch
+        ? directSupportsVisible
+          ? evidence.priceSignals
+          : directSupportsSelected
+            ? selectedPositive.priceSignals
+            : []
+        : selectedPositive.priceSignals.length ? selectedPositive.priceSignals : evidence.priceSignals;
+  const merged: ProductRecord = {
+    ...selected,
+    priceSignals,
+    imageUrl: selected.imageUrl || evidence.imageUrl,
+    attributes: [...new Set([...selected.attributes, ...(evidence.priceSignals.length ? [`Price evidence: ${evidence.basis}`] : []), ...(amountConflict ? ["Price evidence conflict: product-scoped price amounts disagree"] : []), ...(currencyMismatch && !directSupportsVisible && !directSupportsSelected ? ["Price evidence conflict: visible product currency contradicts structured currency"] : [])])],
+    extraction: selected.extraction === "json-ld" ? selected.extraction : "page-signal",
+  };
+  const selectedIndex = products.indexOf(selected);
+  if (selectedIndex >= 0) products[selectedIndex] = merged;
+  else products.push(merged);
+}
+
+function pageExtraction(document: string, sourceUrl: string, domain: string) {
+  const pageTitle = clean(document.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || domain);
+  const pageDescription = decode(document.match(/<meta[^>]+name\s*=\s*["']description["'][^>]+content\s*=\s*["']([^"']*)["']/i)?.[1] || "");
+  const headings = [...document.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)].map((match) => clean(match[1] || "")).filter(Boolean).slice(0, 16);
+  const readable = clean(document.replace(/<(script|style|noscript)[^>]*>[\s\S]*?<\/\1>/gi, " "));
+  const pagePriceSignals = [...new Set(readable.match(/(?:[$€£]\s?\d{1,5}(?:[,.]\d{1,2})?|\d{1,5}(?:[,.]\d{1,2})?\s?(?:USD|EUR|GBP))/gi) || [])].slice(0, 12);
+  return { pageTitle, result: extractProductsFromHtml({ document, sourceUrl, domain, observedAt: new Date().toISOString(), pageTitle, pageDescription, headings, pagePriceSignals }) };
+}
+
+function rejectContradictoryPageCurrencies(document: string, products: ProductRecord[], sourceUrl: string, expected: ProductRecord, pageTitle: string, expectedCountryCode = "") {
+  const detailPage = isSelectedProductDetailPage(sourceUrl);
+  if (!detailPage) return products;
+  const identity = validateProductPageIdentity([expected], products, pageTitle, { allowScopedPageSignal: true });
+  if (!identity.accepted || identity.products.length !== 1) return products;
+  const selectedId = identity.products[0].id;
+  const directConflict = hasConflictingDirectProductCurrency(document);
+  const directCurrency = confirmedProductCurrency(document, { allowStructured: false });
+  const shopifyRuntime = storefrontAdapterRequest(sourceUrl)?.kind === "shopify" && (!hasUrlMarketSelector(sourceUrl) || Boolean(soleProductCurrencySelector(sourceUrl)))
+    ? confirmedShopifyRuntimeMarket(document)
+    : null;
+  const expectedCountry = /^[A-Za-z]{2}$/.test(expectedCountryCode) ? expectedCountryCode.toUpperCase() : "";
+  const runtimeCountryConflict = Boolean(shopifyRuntime && expectedCountry && shopifyRuntime.countryCode !== expectedCountry);
+  const runtimeCurrency = runtimeCountryConflict ? "" : shopifyRuntime?.currency || "";
+  const pageCurrencyConflict = Boolean(directCurrency && runtimeCurrency && directCurrency !== runtimeCurrency);
+  const confirmedCurrency = directCurrency || runtimeCurrency;
+  if (!directConflict && !runtimeCountryConflict && !pageCurrencyConflict && !confirmedCurrency) return products;
+  return products.map((product) => {
+    if (product.id !== selectedId) return product;
+    const supported = product.priceSignals.filter((signal) => isSupportedCurrency(signal.currency));
+    const contradiction = directConflict || runtimeCountryConflict || pageCurrencyConflict
+      ? supported.length > 0
+      : supported.some((signal) => String(signal.currency).trim().toUpperCase() !== confirmedCurrency);
+    if (!contradiction) return product;
+    return {
+      ...product,
+      priceSignals: directConflict || runtimeCountryConflict || pageCurrencyConflict
+        ? []
+        : product.priceSignals.filter((signal) => String(signal.currency || "").trim().toUpperCase() === confirmedCurrency),
+      attributes: [...new Set([...product.attributes, directConflict
+        ? "Price evidence conflict: multiple direct metadata currencies"
+        : runtimeCountryConflict
+          ? "Price evidence conflict: Shopify runtime country contradicts the report market"
+          : pageCurrencyConflict
+            ? "Price evidence conflict: Shopify runtime currency contradicts direct metadata"
+            : "Price evidence conflict: contradictory structured currency rejected"])],
+    };
+  });
+}
+
+function expectedProduct(item: ProductEnrichmentTarget): ProductRecord {
+  return {
+    id: item.productId,
+    domain: item.domain,
+    name: item.expectedName,
+    normalizedName: bilingualNormalize(item.expectedName),
+    description: "",
+    category: "product",
+    jsonLdType: "Product",
+    priceSignals: [],
+    attributes: [],
+    ownership: "path-inferred",
+    extraction: "sitemap",
+    confidence: "Medium",
+    sourceUrl: item.sourceUrl,
+    imageUrl: "",
+    observedAt: new Date().toISOString(),
+    claimIds: [],
+    quantity: item.expectedQuantity || parseCanonicalQuantity(item.expectedName) || undefined,
+  };
+}
+
+function canonicalSelectedPage(value: string) {
+  try {
+    const url = new URL(value);
+    return `${canonicalDomain(url.hostname)}${url.pathname.replace(/\/+$/, "") || "/"}`;
+  } catch { return ""; }
+}
+
+function liveTitleIdentity(pageTitle: string) {
+  return pageTitle.split(/\s+[|–—]\s+/u)[0]?.trim() || pageTitle.trim();
+}
+
+function titleAlignedProduct(product: ProductRecord, pageTitle: string) {
+  const titleIdentity = liveTitleIdentity(pageTitle);
+  const normalizedTitle = bilingualNormalize(titleIdentity.replace(/(?:\.{3}|…)+$/u, ""));
+  const truncatedPrefix = /(?:\.{3}|…)$/u.test(titleIdentity) && normalizedTitle.length >= 12 && product.normalizedName.startsWith(normalizedTitle);
+  const titleTokens = new Set(bilingualTokens(titleIdentity).filter((token) => token.length >= 2));
+  const productTokens = bilingualTokens(product.name).filter((token) => token.length >= 2);
+  const coverage = productTokens.filter((token) => titleTokens.has(token)).length / Math.max(1, productTokens.length);
+  const titleQuantity = parseCanonicalQuantity(titleIdentity) || undefined;
+  return productTokens.length >= 2 && (coverage >= 0.8 || truncatedPrefix) && !quantitiesConflict(titleQuantity, product.quantity);
+}
+
+function observedCatalogReplacement(item: ProductEnrichmentTarget, products: ProductRecord[], pageTitle: string, fetchedUrl: string) {
+  if (item.allowCatalogReplacement !== true || canonicalSelectedPage(item.sourceUrl) !== canonicalSelectedPage(fetchedUrl)) return null;
+  const candidates = products.filter((product) => product.jsonLdType === "Product"
+    && (product.extraction === "json-ld" || product.extraction === "storefront-api")
+    && canonicalSelectedPage(product.sourceUrl) === canonicalSelectedPage(item.sourceUrl)
+    && titleAlignedProduct(product, pageTitle));
+  const groups: ProductRecord[][] = [];
+  for (const candidate of candidates) {
+    const group = groups.find((entries) => validateProductPageIdentity([entries[0]], [candidate], pageTitle).accepted
+      && validateProductPageIdentity([candidate], [entries[0]], pageTitle).accepted);
+    if (group) group.push(candidate);
+    else groups.push([candidate]);
+  }
+  if (groups.length !== 1) return null;
+  const product = [...groups[0]].sort((left, right) =>
+    Number(right.extraction === "storefront-api") - Number(left.extraction === "storefront-api")
+      || Number(right.priceSignals.length > 0) - Number(left.priceSignals.length > 0)
+      || Number(/^https:\/\//i.test(right.imageUrl)) - Number(/^https:\/\//i.test(left.imageUrl))
+      || left.name.localeCompare(right.name))[0];
+  if (!product) return null;
+  const richestPriceEvidence = [...groups[0]].filter((candidate) => candidate.priceSignals.length > 0)
+    .sort((left, right) => right.priceSignals.length - left.priceSignals.length
+      || Number(right.extraction === "json-ld") - Number(left.extraction === "json-ld"))[0];
+  const observedAt = product.observedAt || new Date().toISOString();
+  const audit = catalogReplacementAuditAttribute(item.expectedName, item.sourceUrl);
+  return {
+    ...product,
+    id: item.productId,
+    domain: canonicalDomain(item.domain),
+    normalizedName: bilingualNormalize(product.name),
+    priceSignals: richestPriceEvidence?.priceSignals || product.priceSignals,
+    attributes: [...new Set([...product.attributes.filter((attribute) => !attribute.startsWith(CATALOG_REPLACEMENT_ATTRIBUTE_PREFIX)), audit])],
+    sourceUrl: item.sourceUrl,
+    observedAt,
+    claimIds: [...new Set([...product.claimIds, `${item.productId}-catalog-replacement-${Date.parse(observedAt) || 0}`])],
+    quantity: parseCanonicalQuantity(product.name) || product.quantity || undefined,
+  } satisfies ProductRecord;
+}
+
+function isPositivePriceSignal(signal: ProductRecord["priceSignals"][number]) {
+  return typeof signal.amount === "number" && Number.isFinite(signal.amount) && signal.amount > 0 && isSupportedCurrency(signal.currency);
+}
+
+function comparablePriceAmounts(signals: ProductRecord["priceSignals"]) {
+  return [...new Set(signals
+    .filter(isPositivePriceSignal)
+    .map((signal) => `${String(signal.currency).trim().toUpperCase()}:${Number(signal.amount).toFixed(6)}`))].sort();
+}
+
+function priceSignalsAgree(left: ProductRecord["priceSignals"], right: ProductRecord["priceSignals"]) {
+  const leftAmounts = comparablePriceAmounts(left);
+  const rightAmounts = comparablePriceAmounts(right);
+  if (!leftAmounts.length || !rightAmounts.length) return false;
+  if (leftAmounts.length === rightAmounts.length && leftAmounts.every((amount, index) => amount === rightAmounts[index])) return true;
+  if (leftAmounts.length === 1) return rightAmounts.includes(leftAmounts[0]);
+  if (rightAmounts.length === 1) return leftAmounts.includes(rightAmounts[0]);
+  return false;
+}
+
+function directMetadataPriceSignals(document: string) {
+  const offer = directProductScopedMetadataOffer(document);
+  return offer && isPositivePriceSignal(offer) ? [offer] : [];
+}
+
+function withPositivePrices(product: ProductRecord) {
+  const positive = product.priceSignals.filter(isPositivePriceSignal);
+  const removedObservedAmount = product.priceSignals.some((signal) => typeof signal.amount === "number" && Number.isFinite(signal.amount) && !isPositivePriceSignal(signal));
+  return {
+    ...product,
+    priceSignals: removedObservedAmount && product.priceSignals.length > 1 ? [] : positive,
+    attributes: removedObservedAmount
+      ? [...new Set([...product.attributes, "Price evidence conflict: observed price is non-positive or invalid"])]
+      : product.attributes,
+  };
+}
+
+function hasConfirmedPrice(products: ProductRecord[]) {
+  return products.some((product) => product.priceSignals.some(isPositivePriceSignal));
+}
+
+function confirmedAdapterCurrency(document: string, matchedProduct?: ProductRecord, expectedCountryCode = "") {
+  if (hasConflictingDirectProductCurrency(document)) return "";
+  if (matchedProduct?.attributes.some((attribute) => attribute.startsWith("Price evidence conflict:"))) return "";
+  const storefrontCurrency = confirmedProductCurrency(document, { allowStructured: false });
+  const runtimeMarket = confirmedShopifyRuntimeMarket(document);
+  const expectedCountry = /^[A-Za-z]{2}$/.test(expectedCountryCode) ? expectedCountryCode.toUpperCase() : "";
+  if (runtimeMarket && expectedCountry && runtimeMarket.countryCode !== expectedCountry) return "";
+  const matchedCurrencies = [...new Set((matchedProduct?.priceSignals || [])
+    .map((signal) => {
+      const currency = signal.currency?.trim().toUpperCase() || "";
+      return currency && new RegExp(`(?:^|[^A-Z])${currency}(?:[^A-Z]|$)`, "i").test(signal.raw) ? currency : "";
+    })
+    .filter(isSupportedCurrency))];
+  if (matchedCurrencies.length > 1) return "";
+  if (storefrontCurrency && matchedCurrencies.length === 1 && storefrontCurrency !== matchedCurrencies[0]) return "";
+  const runtimeCurrency = runtimeMarket?.currency || "";
+  const confirmedCurrencies = [...new Set([storefrontCurrency, matchedCurrencies[0], runtimeCurrency].filter(Boolean))];
+  if (confirmedCurrencies.length > 1) return "";
+  return confirmedCurrencies[0] || "";
+}
+
+function hasSecureImage(products: ProductRecord[]) {
+  return products.some((product) => /^https:\/\//i.test(product.imageUrl));
+}
+
+function productsCanShareEvidence(left: ProductRecord | null, right: ProductRecord | null, pageTitle: string) {
+  return Boolean(left && right
+    && validateProductPageIdentity([left], [right], pageTitle, { allowScopedPageSignal: true }).accepted
+    && validateProductPageIdentity([right], [left], pageTitle, { allowScopedPageSignal: true }).accepted);
+}
+
+function comparablePrice(product: ProductRecord) {
+  const prices = product.priceSignals.filter(isPositivePriceSignal);
+  return prices.length > 0 && new Set(prices.map((signal) => signal.currency)).size === 1 && new Set(prices.map((signal) => signal.amount)).size === 1;
+}
+
+function safeProductUrl(product: ProductRecord, domain: string) {
+  try {
+    const url = new URL(product.sourceUrl);
+    return /^https?:$/.test(url.protocol)
+      && canonicalDomain(url.hostname) === canonicalDomain(domain)
+      && (Boolean(storefrontAdapterRequest(url.toString())) || /\/(?:products?|p)\/[^/]+/i.test(url.pathname))
+      ? url.toString()
+      : "";
+  } catch {
+    return "";
+  }
+}
+
+export function selectPrimaryProductPriceTargets(products: ProductRecord[], domain: string, maxPages = 6): ProductEnrichmentTarget[] {
+  const limit = Math.max(0, Math.min(MAX_ENRICHMENT_TARGETS, Math.floor(maxPages)));
+  const seen = new Set<string>();
+  const candidates = products
+    .filter((product) => (product.jsonLdType === "Product" || (product.jsonLdType === "PageSignal" && product.claimIds.some((id) => id.endsWith("-public-product-link-observed")))) && !comparablePrice(product))
+    .map((product) => ({ product, sourceUrl: safeProductUrl(product, domain) }))
+    .filter((entry) => Boolean(entry.sourceUrl) && !seen.has(entry.sourceUrl) && Boolean(seen.add(entry.sourceUrl)))
+    .sort((left, right) => Number(Boolean(right.product.quantity || parseCanonicalQuantity(right.product.name))) - Number(Boolean(left.product.quantity || parseCanonicalQuantity(left.product.name))) || left.product.name.localeCompare(right.product.name));
+  const seenFamilies = new Set<string>();
+  const distinctFamilies: typeof candidates = [];
+  const repeatedFamilies: typeof candidates = [];
+  for (const entry of candidates) {
+    const family = entry.product.normalizedName || bilingualNormalize(entry.product.name);
+    (seenFamilies.has(family) ? repeatedFamilies : distinctFamilies).push(entry);
+    seenFamilies.add(family);
+  }
+  return [...distinctFamilies, ...repeatedFamilies]
+    .slice(0, limit)
+    .map(({ product, sourceUrl }) => ({
+      domain: canonicalDomain(domain),
+      sourceUrl,
+      productId: product.id,
+      expectedName: product.name,
+      expectedType: "Product" as const,
+      pairScore: 0,
+      role: "primary" as const,
+      allowCatalogReplacement: true as const,
+    }));
+}
+
+function priceAmount(value: string) {
+  const matched = value.match(/\d{1,5}(?:[,.]\d{1,2})?/i)?.[0];
+  if (!matched) return null;
+  const normalized = matched.includes(",") && !matched.includes(".") ? matched.replace(",", ".") : matched.replace(/,/g, "");
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+export function claimablePagePricePatterns(values: string[]) {
+  return values.filter((value) => priceAmount(value) !== 0);
+}
+
+export type EnrichmentDependencies = {
+  fetchImpl?: typeof fetch;
+  robotsResolver?: Pick<typeof sharedRobotsPolicyResolver, "resolve">;
+  sleep?: (milliseconds: number) => Promise<void>;
+};
+
+export async function enrichProductTargets(targets: ProductEnrichmentTarget[], maxPages = 24, dependencies: EnrichmentDependencies = {}) {
+  const boundedMax = Math.max(0, Math.min(MAX_ENRICHMENT_TARGETS, Math.floor(maxPages)));
+  const selected = targets.slice(0, boundedMax);
+  const fetchImpl = dependencies.fetchImpl;
+  const robotsResolver = dependencies.robotsResolver || sharedRobotsPolicyResolver;
+  const sleep = dependencies.sleep || ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+  const retryQueues = new Map<string, Promise<void>>();
+  const waitForRetry = async (domain: string, milliseconds: number) => {
+    const previous = retryQueues.get(domain) || Promise.resolve();
+    const current = previous.catch(() => undefined).then(() => sleep(milliseconds));
+    retryQueues.set(domain, current);
+    try { await current; } finally { if (retryQueues.get(domain) === current) retryQueues.delete(domain); }
+  };
+  const robotsByDomain = new Map<string, Awaited<ReturnType<typeof sharedRobotsPolicyResolver.resolve>>>();
+  await Promise.all([...new Set(selected.map((item) => item.domain))].map(async (domain) => {
+    const preferred = selected.find((item) => item.domain === domain)?.sourceUrl || domain;
+    robotsByDomain.set(domain, await robotsResolver.resolve(domain, preferred));
+  }));
+
+  const shopifyCurrencyByEndpoint = new Map<string, Promise<string>>();
+  const shopifyCurrencyFor = async (sourceUrl: string, domain: string, robots: { allows: (path: string) => boolean }) => {
+    if (hasUrlMarketSelector(sourceUrl) || hasRegionalOrLanguagePathSelector(sourceUrl)) return "";
+    const endpoint = shopifyCartRequest(sourceUrl);
+    if (!endpoint) return "";
+    const endpointUrl = new URL(endpoint);
+    if (!robots.allows(`${endpointUrl.pathname}${endpointUrl.search}`)) return "";
+    const existing = shopifyCurrencyByEndpoint.get(endpoint);
+    if (existing) return existing;
+    const pending = (async () => {
+      const response = await fetchSameDomain(endpoint, domain, "application/json", fetchImpl, waitForRetry);
+      if (!response.ok || !/json|javascript/i.test(response.contentType)) return "";
+      try { return confirmedShopifyCartCurrency(JSON.parse(response.text)); } catch { return ""; }
+    })();
+    shopifyCurrencyByEndpoint.set(endpoint, pending);
+    return pending;
+  };
+
+  const structuredRecovery = async (item: ProductEnrichmentTarget, robots: { allows: (path: string) => boolean }) => {
+    const adapter = storefrontAdapterRequest(item.sourceUrl);
+    if (!adapter) return { product: null as ProductRecord | null, reason: "" };
+    const adapterLabel = adapter.kind === "shopify" ? "Shopify product" : "WooCommerce Store API";
+    const adapterUrl = new URL(adapter.endpointUrl);
+    if (!robots.allows(`${adapterUrl.pathname}${adapterUrl.search}`)) return { product: null, reason: `robots.txt disallows the ${adapterLabel} endpoint.` };
+    const response = await fetchSameDomain(adapter.endpointUrl, item.domain, "application/json", fetchImpl, waitForRetry);
+    if (!response.ok || !/json|javascript/i.test(response.contentType)) return { product: null, reason: `${adapterLabel} endpoint returned HTTP ${response.status} or non-JSON content.` };
+    let payload: unknown;
+    try { payload = JSON.parse(response.text); } catch { return { product: null, reason: `${adapterLabel} endpoint returned invalid JSON.` }; }
+    const observedAt = new Date().toISOString();
+    const expected = expectedProduct(item);
+    const currencylessShopify = adapter.kind === "shopify"
+      ? parseShopifyProduct({ payload, requestedKey: adapter.requestedKey, sourceUrl: item.sourceUrl, domain: item.domain, observedAt, currency: "", expectedQuantity: expected.quantity })
+      : null;
+    const currency = currencylessShopify
+      && !item.marketCountryCode
+      && /no same-page currency/i.test(currencylessShopify.gap)
+      ? await shopifyCurrencyFor(item.sourceUrl, item.domain, robots)
+      : "";
+    const result = adapter.kind === "shopify"
+      ? currency
+        ? parseShopifyProduct({ payload, requestedKey: adapter.requestedKey, sourceUrl: item.sourceUrl, domain: item.domain, observedAt, currency, expectedQuantity: expected.quantity })
+        : currencylessShopify!
+      : parseWooCommerceProduct({ payload, requestedKey: adapter.requestedKey, sourceUrl: item.sourceUrl, domain: item.domain, observedAt });
+    const candidate = result.product ? withPositivePrices(result.product) : null;
+    if (!candidate || !hasConfirmedPrice([candidate])) return { product: null, reason: result.gap || `${adapterLabel} did not expose a comparable positive price.` };
+    const identity = validateProductPageIdentity([expected], [candidate], candidate.name, { allowScopedPageSignal: true });
+    if (!identity.accepted) return { product: null, reason: identity.reason };
+    return { product: { ...identity.products[0], id: item.productId }, reason: "" };
+  };
+
+  const enrichOne = async (item: ProductEnrichmentTarget) => {
+    const gap = (reason: string, code?: EnrichmentGap["code"], httpStatus?: number, failureKind?: EnrichmentGap["failureKind"]): EnrichmentGap => ({ url: item.sourceUrl, productId: item.productId, role: item.role, reason, ...(code ? { code } : {}), ...(httpStatus !== undefined ? { httpStatus } : {}), ...(failureKind ? { failureKind } : {}) });
+    try {
+      const robotsResult = robotsByDomain.get(item.domain);
+      const availability = robotsResult?.availability || "unreachable";
+      if (availability === "unreachable") return { product: null, gap: gap("robots.txt was unreachable, so selected-product enrichment was skipped.", "robots_unreachable", undefined, "robots") };
+      const robots = robotsResult?.policy;
+      if (!robots) return { product: null, gap: gap("robots.txt was unreachable, so selected-product enrichment was skipped.", "robots_unreachable", undefined, "robots") };
+      if (!robots.allows(new URL(item.sourceUrl).pathname)) return { product: null, gap: gap("robots.txt disallows this selected product page.", "robots_disallowed", undefined, "robots") };
+      let fetched = await fetchSameDomain(item.sourceUrl, item.domain, "text/html,application/xhtml+xml", fetchImpl, waitForRetry);
+      if (!fetched.ok || !/text\/html|application\/xhtml\+xml/i.test(fetched.contentType)) {
+        const recovery = await structuredRecovery(item, robots);
+        if (recovery.product) return { product: recovery.product, gap: null };
+        const contentFailure = fetched.ok ? "content" : "http";
+        const retryNote = fetched.retryExhausted ? " after one bounded retry" : "";
+        const recoveryNote = recovery.reason ? ` ${recovery.reason}` : "";
+        const unresolved = gap(`Selected product page returned HTTP ${fetched.status} or non-HTML content${retryNote}.${recoveryNote}`, "fetch_failed", fetched.status, contentFailure);
+        return { product: null, gap: fetched.retryExhausted ? { ...unresolved, retryExhausted: true as const } : unresolved };
+      }
+      const marketRetryUrl = redirectedMarketRetryUrl(item.sourceUrl, fetched.url, item.marketCountryCode || "", translatedMarketLanguage(item.expectedName, fetched.url));
+      let marketRetryApplied = false;
+      if (marketRetryUrl && robots.allows(new URL(marketRetryUrl).pathname)) {
+        const marketFetched = await fetchSameDomain(marketRetryUrl, item.domain, "text/html,application/xhtml+xml", fetchImpl, waitForRetry);
+        if (marketFetched.ok && /text\/html|application\/xhtml\+xml/i.test(marketFetched.contentType)) {
+          fetched = marketFetched;
+          marketRetryApplied = true;
+        }
+      }
+      const requestedMarket = publicSourceMarketEvidence(item.sourceUrl);
+      const fetchedMarket = publicSourceMarketEvidence(fetched.url);
+      const requestedContext = publicSourceMarketContext(item.sourceUrl);
+      const fetchedContext = publicSourceMarketContext(fetched.url);
+      if (requestedMarket.conflict || fetchedMarket.conflict
+        || requestedContext.contextKey.includes("country:?")
+        || fetchedContext.contextKey.includes("country:?")
+        || (requestedMarket.countryCode && requestedMarket.countryCode !== fetchedMarket.countryCode)
+        || (requestedContext.currencyCode && requestedContext.currencyCode !== fetchedContext.currencyCode)) {
+        return { product: null, gap: gap("Selected product redirect lost, changed, or conflicted with the requested market.", "identity_mismatch", undefined, "redirect") };
+      }
+      const extracted = pageExtraction(fetched.text, fetched.url, item.domain);
+      const expected = expectedProduct(item);
+      if (marketRetryApplied) expected.sourceUrl = fetched.url;
+      const analyticsProduct = embeddedProductAnalyticsRecord(
+        fetched.text,
+        fetched.url,
+        item.domain,
+        item.productId,
+        new Date().toISOString(),
+      );
+      if (analyticsProduct) extracted.result.products.push(analyticsProduct);
+      addScopedProductPageEvidence(fetched.text, fetched.url, expected, extracted.result.products, extracted.pageTitle);
+      extracted.result.products = rejectContradictoryPageCurrencies(fetched.text, extracted.result.products, fetched.url, expected, extracted.pageTitle, item.marketCountryCode);
+      const canonicalCrossLanguageOptions = { allowCanonicalCrossLanguageIdentity: canonicalSelectedPage(item.sourceUrl) === canonicalSelectedPage(fetched.url) };
+      const rawInitialIdentity = validateProductPageIdentity([expected], extracted.result.products, extracted.pageTitle, { allowScopedPageSignal: true, ...canonicalCrossLanguageOptions });
+      const rawMatchedProduct = rawInitialIdentity.products[0];
+      const pagePriceConflicts = [...new Set(extracted.result.products.flatMap((product) => product.attributes.filter((attribute) => attribute.startsWith("Price evidence conflict:"))))];
+      extracted.result.products = extracted.result.products.map(withPositivePrices);
+      const initialIdentity = validateProductPageIdentity([expected], extracted.result.products, extracted.pageTitle, canonicalCrossLanguageOptions);
+      const replacementCandidates = [...extracted.result.products];
+      let adapterGap = "";
+      let adapterGapHttpStatus: number | undefined;
+      let adapterGapFailureKind: EnrichmentGap["failureKind"] = "adapter";
+      let adapterEvidenceProduct: ProductRecord | null = null;
+      const adapter = storefrontAdapterRequest(fetched.url);
+      const strongestInitialProduct = initialIdentity.products[0];
+      if (adapter && (!initialIdentity.accepted || !strongestInitialProduct || !hasConfirmedPrice([strongestInitialProduct]) || !hasSecureImage([strongestInitialProduct]))) {
+        const adapterLabel = adapter.kind === "shopify" ? "Shopify product" : "WooCommerce Store API";
+        try {
+          const adapterUrl = new URL(adapter.endpointUrl);
+          if (!robots.allows(`${adapterUrl.pathname}${adapterUrl.search}`)) {
+            adapterGap = `robots.txt disallows the ${adapterLabel} endpoint.`;
+          } else {
+            const adapterResponse = await fetchSameDomain(adapter.endpointUrl, item.domain, "application/json", fetchImpl, waitForRetry);
+            if (!adapterResponse.ok) {
+              adapterGap = `${adapterLabel} endpoint returned HTTP ${adapterResponse.status} or non-JSON content.`;
+              adapterGapHttpStatus = adapterResponse.status;
+              adapterGapFailureKind = "http";
+            } else if (!/json|javascript/i.test(adapterResponse.contentType)) {
+              adapterGap = `${adapterLabel} endpoint returned HTTP ${adapterResponse.status} or non-JSON content.`;
+              adapterGapFailureKind = "content";
+            } else {
+              const payload = JSON.parse(adapterResponse.text);
+              const observedAt = new Date().toISOString();
+              const selectedMarket = hasUrlMarketSelector(fetched.url);
+              // Shopify's legacy .js payload has no currency field. A page
+              // currency cannot qualify its amount when the selected market is
+              // carried only by URL query state that the endpoint may ignore.
+              const selectedCurrency = soleProductCurrencySelector(fetched.url);
+              const selectedRuntime = confirmedShopifyRuntimeMarket(fetched.text);
+              const qualifiedSelectedCurrency = adapter.kind === "shopify" && selectedCurrency
+                && soleProductCurrencySelector(adapterResponse.url) === selectedCurrency
+                && selectedRuntime?.currency === selectedCurrency
+                && confirmedAdapterCurrency(fetched.text, rawMatchedProduct, item.marketCountryCode) === selectedCurrency
+                ? selectedCurrency : "";
+              const qualifiedRegionalCurrency = adapter.kind === "shopify"
+                ? regionalShopifyCurrency(fetched.text, fetched.url, adapterResponse.url, item.marketCountryCode || "", rawMatchedProduct)
+                : "";
+              let directPageCurrency = selectedMarket ? qualifiedSelectedCurrency || qualifiedRegionalCurrency : confirmedAdapterCurrency(fetched.text, rawMatchedProduct, item.marketCountryCode);
+              const currencylessShopify = adapter.kind === "shopify" && !directPageCurrency
+                ? parseShopifyProduct({ payload, requestedKey: adapter.requestedKey, sourceUrl: fetched.url, domain: item.domain, observedAt, currency: "", expectedQuantity: expected.quantity })
+                : null;
+              const expectedCountry = /^[A-Za-z]{2}$/.test(item.marketCountryCode || "") ? item.marketCountryCode!.toUpperCase() : "";
+              const runtimeMarket = confirmedShopifyRuntimeMarket(fetched.text);
+              const cartCurrencyEligible = adapter.kind === "shopify"
+                && !selectedMarket
+                && !directPageCurrency
+                && !hasConflictingDirectProductCurrency(fetched.text)
+                && pagePriceConflicts.length === 0
+                && (rawMatchedProduct?.priceSignals.length || 0) === 0
+                && !rawMatchedProduct?.attributes.some((attribute) => attribute.startsWith("Price evidence conflict:"))
+                && (!expectedCountry || runtimeMarket?.countryCode === expectedCountry)
+                && /no same-page currency/i.test(currencylessShopify?.gap || "");
+              if (cartCurrencyEligible) directPageCurrency = await shopifyCurrencyFor(fetched.url, item.domain, robots);
+              const adapterResult = adapter.kind === "shopify"
+                ? directPageCurrency
+                  ? parseShopifyProduct({ payload, requestedKey: adapter.requestedKey, sourceUrl: fetched.url, domain: item.domain, observedAt, currency: directPageCurrency, expectedQuantity: expected.quantity })
+                  : currencylessShopify!
+                : parseWooCommerceProduct({ payload, requestedKey: adapter.requestedKey, sourceUrl: fetched.url, domain: item.domain, observedAt: new Date().toISOString() });
+              const adapterCurrencies = new Set((adapterResult.product?.priceSignals || []).map((signal) => signal.currency?.toUpperCase()).filter(Boolean));
+              const adapterCurrencyConflict = directPageCurrency && [...adapterCurrencies].some((currency) => currency !== directPageCurrency.toUpperCase())
+                ? [`Price evidence conflict: direct page currency ${directPageCurrency.toUpperCase()} contradicts ${adapterLabel} currency ${[...adapterCurrencies].join(", ")}.`]
+                : [];
+              const regionalWooCommerce = adapter.kind === "woocommerce" && (selectedMarket || hasRegionalOrLanguagePathSelector(fetched.url));
+              const positiveAdapterProduct = adapterResult.product ? withPositivePrices(adapterResult.product) : null;
+              const adapterPriceSignals = positiveAdapterProduct?.priceSignals || [];
+              const directPageSignals = directMetadataPriceSignals(fetched.text);
+              const visiblePageSignals = extractScopedProductPageEvidence(fetched.text, fetched.url).priceSignals;
+              const selectedPageSignals = rawMatchedProduct?.extraction === "json-ld"
+                ? withPositivePrices(rawMatchedProduct).priceSignals
+                : [];
+              const adapterAmountConflict = Boolean(adapterPriceSignals.length
+                && [directPageSignals, visiblePageSignals, selectedPageSignals]
+                  .filter((signals) => signals.length > 0)
+                  .some((signals) => !priceSignalsAgree(adapterPriceSignals, signals)));
+              const adapterAmountConflictMessage = adapterAmountConflict
+                ? [`Price evidence conflict: page amounts contradict ${adapterLabel} amounts.`]
+                : [];
+              // A matching query is not proof that a currency-less .js amount
+              // used that currency. Require independent product-page agreement.
+              const selectedAmountUnconfirmed = Boolean(qualifiedSelectedCurrency && ![directPageSignals, visiblePageSignals, selectedPageSignals]
+                .some(signals => signals.length > 0 && priceSignalsAgree(adapterPriceSignals, signals)));
+              const adapterConflicts = [...new Set([...pagePriceConflicts, ...adapterCurrencyConflict, ...adapterAmountConflictMessage,
+                ...(selectedAmountUnconfirmed ? ["Price evidence conflict: currency-selected adapter amount lacks matching product-page price evidence"] : [])])];
+              if (adapterResult.product) {
+                adapterEvidenceProduct = {
+                  ...positiveAdapterProduct!,
+                  priceSignals: adapterConflicts.length || regionalWooCommerce ? [] : positiveAdapterProduct!.priceSignals,
+                  attributes: [...new Set([...adapterResult.product.attributes, ...adapterConflicts])],
+                };
+                extracted.result.products.push(adapterEvidenceProduct);
+              }
+              if (item.allowCatalogReplacement === true && !initialIdentity.accepted) {
+                const replacementAdapterResult = adapter.kind === "shopify"
+                  ? parseShopifyProduct({ payload, requestedKey: adapter.requestedKey, sourceUrl: fetched.url, domain: item.domain, observedAt, currency: directPageCurrency })
+                  : adapterResult;
+                if (replacementAdapterResult.product) {
+                  const positiveReplacementProduct = withPositivePrices(replacementAdapterResult.product);
+                  replacementCandidates.push({
+                    ...positiveReplacementProduct,
+                    priceSignals: adapterConflicts.length || regionalWooCommerce ? [] : positiveReplacementProduct.priceSignals,
+                    attributes: [...new Set([...replacementAdapterResult.product.attributes, ...adapterConflicts])],
+                  });
+                }
+              }
+              adapterGap = adapterResult.gap;
+            }
+          }
+        } catch (error) {
+          if (error instanceof ProductFetchFailure) {
+            adapterGap = `${adapterLabel} endpoint could not be fetched.`;
+            adapterGapFailureKind = error.failureKind;
+            if (error.failureKind === "network") adapterGapHttpStatus = 0;
+          } else {
+            adapterGap = error instanceof SyntaxError ? `${adapterLabel} endpoint returned invalid JSON.` : `${adapterLabel} endpoint could not be fetched.`;
+            adapterGapFailureKind = "content";
+          }
+        }
+      }
+      const identity = validateProductPageIdentity([expected], extracted.result.products, extracted.pageTitle, { allowScopedPageSignal: true, ...canonicalCrossLanguageOptions });
+      if (!identity.accepted) {
+        const replacement = observedCatalogReplacement(item, replacementCandidates, extracted.pageTitle, fetched.url);
+        return replacement ? { product: replacement, gap: null } : { product: null, gap: gap(identity.reason, "identity_mismatch", undefined, "identity") };
+      }
+      const originalIdentityProduct = strongestInitialProduct
+        ? identity.products.find((product) => product.id === strongestInitialProduct.id) || null
+        : null;
+      const adapterIdentityProduct = adapterEvidenceProduct
+        && identity.products.includes(adapterEvidenceProduct)
+        ? adapterEvidenceProduct
+        : null;
+      const originalAccepted = originalIdentityProduct && hasConfirmedPrice([originalIdentityProduct])
+        ? originalIdentityProduct
+        : null;
+      const adapterCompatible = !originalIdentityProduct || productsCanShareEvidence(adapterIdentityProduct, originalIdentityProduct, extracted.pageTitle);
+      const accepted = originalAccepted
+        ? (!hasSecureImage([originalAccepted]) && adapterIdentityProduct?.imageUrl && productsCanShareEvidence(originalAccepted, adapterIdentityProduct, extracted.pageTitle)
+            ? { ...originalAccepted, imageUrl: adapterIdentityProduct.imageUrl }
+            : originalAccepted)
+        : adapterIdentityProduct
+          && hasConfirmedPrice([adapterIdentityProduct])
+          && adapterCompatible
+          ? { ...adapterIdentityProduct, imageUrl: adapterIdentityProduct.imageUrl || (productsCanShareEvidence(adapterIdentityProduct, originalIdentityProduct, extracted.pageTitle) ? originalIdentityProduct?.imageUrl : "") || "" }
+          : originalIdentityProduct || identity.products[0];
+      const unresolvedAdapterGap = adapterGap && accepted && !hasConfirmedPrice([accepted]) ? adapterGap : "";
+      return { product: accepted ? { ...accepted, id: item.productId } : null, gap: unresolvedAdapterGap ? gap(unresolvedAdapterGap, "adapter_limited", adapterGapHttpStatus, adapterGapFailureKind) : null };
+    } catch (error) {
+      const failureKind = error instanceof ProductFetchFailure ? error.failureKind : "content";
+      return { product: null, gap: gap(error instanceof Error ? `Selected product page could not be fetched: ${error.message}` : "Selected product page could not be fetched.", "fetch_failed", failureKind === "network" ? 0 : undefined, failureKind) };
+    }
+  };
+
+  const entries = new Array<Awaited<ReturnType<typeof enrichOne>>>(selected.length);
+  const targetIndexesByDomain = new Map<string, number[]>();
+  selected.forEach((item, index) => targetIndexesByDomain.set(item.domain, [...(targetIndexesByDomain.get(item.domain) || []), index]));
+  await Promise.all([...targetIndexesByDomain.values()].map(async (indexes) => {
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(MAX_PER_DOMAIN_CONCURRENCY, indexes.length) }, async () => {
+      while (cursor < indexes.length) {
+        const index = indexes[cursor];
+        cursor += 1;
+        entries[index] = await enrichOne(selected[index]);
+      }
+    }));
+  }));
+
+  const products = entries.flatMap((entry) => entry.product ? [entry.product] : []);
+  // Coverage gaps describe unresolved targets only. A missing robots.txt is a
+  // diagnostic observation, not a second outcome for a successfully fetched
+  // product page.
+  const gaps = entries.flatMap((entry) => entry.gap ? [entry.gap] : []);
+  return { products, coverage: { pagesRequested: selected.length, pagesFetched: products.length, maxPages: boundedMax, gaps } satisfies ProductEnrichmentCoverage };
+}
+
+export function publicProductTarget(value: unknown): ProductEnrichmentTarget | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const item = value as Record<string, unknown>;
+  const domain = canonicalDomain(text(item.domain, 300));
+  const productId = text(item.productId, 300);
+  const expectedName = text(item.expectedName, 160);
+  let sourceUrl = "";
+  try {
+    const url = new URL(text(item.sourceUrl, 1_000));
+    sourceUrl = /^https?:$/.test(url.protocol)
+      && canonicalDomain(url.hostname) === domain
+      && /\/(?:products?|p|shop|store)\//i.test(url.pathname)
+      ? url.toString()
+      : "";
+  } catch {
+    sourceUrl = "";
+  }
+  if (!domain || !sourceUrl || !productId || !expectedName || item.expectedType !== "Product") return null;
+  const rawMarketCountryCode = typeof item.marketCountryCode === "string" ? item.marketCountryCode.trim().toUpperCase() : "";
+  const marketCountryCode = /^[A-Z]{2}$/.test(rawMarketCountryCode) ? rawMarketCountryCode : "";
+  return { domain, sourceUrl, productId, expectedName, expectedType: "Product", pairScore: typeof item.pairScore === "number" && Number.isFinite(item.pairScore) ? item.pairScore : 0, role: item.role === "rival" ? "rival" : "primary", ...(marketCountryCode ? { marketCountryCode } : {}), ...(item.allowCatalogReplacement === true ? { allowCatalogReplacement: true as const } : {}) };
+}

@@ -1,0 +1,61 @@
+{
+  "name": "10signals",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "vinext dev",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && vinext build",
+    "build:vps": "cross-env MARKET_SIGNAL_DEPLOY_TARGET=node npm run build && node scripts/assert-vps-build.mjs",
+    "start": "vinext start",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "test": "node --test tests/local-report-queue.test.mjs"
+  },
+  "dependencies": {
+    "@better-auth/cimd": "1.7.2",
+    "@better-auth/mcp": "1.7.2",
+    "@better-auth/oauth-provider": "1.7.2",
+    "@fontsource-variable/archivo": "5.3.0",
+    "@fontsource/abril-fatface": "5.3.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "@trigger.dev/sdk": "4.5.4",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-rsc": "0.5.26",
+    "better-auth": "1.7.2",
+    "better-sqlite3": "12.4.1",
+    "drizzle-orm": "0.45.2",
+    "jose": "6.2.10",
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "react-server-dom-webpack": "19.2.6",
+    "stripe": "22.5.0",
+    "tldts": "7.4.11",
+    "undici": "7.29.0",
+    "vinext": "0.0.50",
+    "vite": "8.0.13",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.2.1",
+    "@trigger.dev/build": "4.5.4",
+    "@types/better-sqlite3": "7.6.13",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "agentation": "3.0.2",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "better-auth-v16": "npm:better-auth@1.6.26",
+    "cross-env": "10.1.0",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3"
+  },
+  "type": "module"
+}

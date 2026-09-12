@@ -1,0 +1,105 @@
+<!-- @dsCard group="Brand" viewport="1100x700" subtitle="One-page reference: tokens, glyphs, components, kit" name="Design system reference" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>10 Signals — design system reference</title><link rel="stylesheet" href="styles.css">
+<meta name="viewport" content="width=device-width, initial-scale=1"><script src="/design-system/app-shell.js"></script>
+<style>
+body{padding:0}
+.wrap{max-width:1100px;margin:0 auto;padding:32px 28px 80px}
+h1{font-size:var(--text-4xl);font-weight:600;letter-spacing:var(--tracking-display);margin:0 0 6px}
+h2{font-size:var(--text-xl);font-weight:600;margin:0 0 12px}
+.k{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);margin:0 0 4px}
+.lede{color:var(--text-muted);margin:0 0 28px;max-width:720px}
+section{padding:24px 0;border-top:1px solid var(--border)}
+.grid{display:grid;gap:12px}
+.card{background:var(--surface);border-radius:var(--radius-lg);padding:14px 16px}
+.sw{display:grid;gap:3px;font-size:11px;color:var(--text-muted)}
+.sw i{display:block;height:44px;border-radius:var(--radius-md);border:1px solid var(--border)}
+.sw b{font-weight:600;color:var(--text)}
+code{font-family:var(--font-mono);font-size:11px;color:var(--text-body)}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 8px;border-radius:var(--radius-pill);white-space:nowrap}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+ul{margin:0;padding-inline-start:18px;font-size:13px;color:var(--text-body);display:grid;gap:4px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:start;font-weight:400;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);padding:6px 10px;background:var(--surface)}
+td{padding:8px 10px;border-top:1px solid var(--border);vertical-align:top}
+td:first-child{font-weight:600;white-space:nowrap}
+a.file{font-size:12px}
+.toc{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin-bottom:8px}
+</style></head><body><div class="wrap">
+<h1>Design system reference</h1>
+<p class="lede">Everything a designer or agent needs on one page: the rules, the tokens, the component inventory, and where each file lives. Source of truth is <code>readme.md</code> and <code>tokens/*.css</code>.</p>
+<nav class="toc"><a href="#principles">Principles</a><a href="#color">Color</a><a href="#type">Type</a><a href="#space">Spacing &amp; radii</a><a href="#glyphs">Glyphs</a><a href="#components">Components</a><a href="#kit">UI kit</a><a href="#files">Files</a></nav>
+
+<section id="principles"><h2>Principles</h2>
+<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+<div class="card"><p class="k">01</p><p style="margin:0;font-size:14px">Say what was checked and what was not. "Not observed", never 0. "Needs evidence", never a guess.</p></div>
+<div class="card"><p class="k">02</p><p style="margin:0;font-size:14px">Provenance is shape plus fill, never color alone: ● observed, ◐ inferred, ◔ limited, ○ unavailable.</p></div>
+<div class="card"><p class="k">03</p><p style="margin:0;font-size:14px">One blue. No red/green judgement. Favourable vs unfavourable is words and position.</p></div>
+<div class="card"><p class="k">04</p><p style="margin:0;font-size:14px">Every recommendation carries its origin: AI-drafted or Rule-based. Every claim ends in a source and a date.</p></div>
+<div class="card"><p class="k">05</p><p style="margin:0;font-size:14px">Not-live functionality wears a dashed "Planned" pill. Nothing is presented as shipped that isn't.</p></div>
+<div class="card"><p class="k">06</p><p style="margin:0;font-size:14px">Bilingual by default: logical properties, <code>dir="ltr"</code> on numbers, prices, domains and URLs.</p></div>
+</div></section>
+
+<section id="color"><h2>Color</h2>
+<div class="grid" style="grid-template-columns:repeat(8,minmax(0,1fr))">
+<div class="sw"><i style="background:var(--blue-500)"></i><b>Primary</b><span>--primary #1d9bf0</span></div>
+<div class="sw"><i style="background:var(--blue-700)"></i><b>Deep</b><span>--primary-deep #0b6cb0</span></div>
+<div class="sw"><i style="background:var(--blue-50)"></i><b>Tint</b><span>--primary-tint #e8f5fe</span></div>
+<div class="sw"><i style="background:var(--ink-900)"></i><b>Text / ink fill</b><span>--text #0f1419</span></div>
+<div class="sw"><i style="background:var(--ink-700)"></i><b>Body</b><span>--text-body #33404a</span></div>
+<div class="sw"><i style="background:var(--ink-500)"></i><b>Muted</b><span>--text-muted #536471</span></div>
+<div class="sw"><i style="background:var(--grey-200)"></i><b>Control border</b><span>--border-strong #cfd9de</span></div>
+<div class="sw"><i style="background:var(--grey-50)"></i><b>Surface</b><span>--surface #f7f9f9</span></div>
+</div>
+<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0">Page is white; cards are <code>--surface</code> with <code>--border</code> #eff3f4 hairlines and no shadow. Blue text only on the tint, and only as <code>--primary-deep</code>.</p></section>
+
+<section id="type"><h2>Type</h2>
+<div class="grid" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)">
+<div><p style="margin:0;font-size:var(--text-display);line-height:1.08;font-weight:600;letter-spacing:-.02em">Know your competitors.</p><p style="margin:8px 0 0;font-size:30px;font-weight:600;letter-spacing:-.02em">lumenandoak.com</p><p style="margin:6px 0 0;font-size:17px;font-weight:600">Section title 17</p><p style="margin:6px 0 0;font-size:14px">Body 14 · Plus Jakarta Sans 400</p><p style="margin:4px 0 0;font-size:12px;color:var(--text-muted)">Meta 12 · muted</p><p class="k" style="margin-top:6px">Kicker 10 · uppercase tracked</p></div>
+<div><div lang="ar" dir="rtl"><p style="margin:0;font-size:30px;font-weight:600">عرف منافسيك وأسعارهم. مع المصدر.</p><p style="margin:6px 0 0;font-size:14px;color:var(--text-body)">Cairo للعربية بنفس المقاسات؛ الأرقام والنطاقات تبقى <span dir="ltr">LTR</span>.</p></div><p dir="ltr" style="margin:14px 0 0;font-size:22px;font-weight:600;font-variant-numeric:tabular-nums">$34.00 <span style="font-size:13px;color:var(--text-muted);font-weight:400;font-style:italic">· Not observed</span></p><p style="margin:6px 0 0;font-size:12px;color:var(--text-muted)">Weights 400 and 600 only. Tabular numerals in every column.</p></div>
+</div></section>
+
+<section id="space"><h2>Spacing &amp; radii</h2>
+<div class="row" style="gap:18px;align-items:flex-end">
+<div class="sw"><i style="width:4px;height:4px;background:var(--primary);border:0;border-radius:2px"></i><b>4</b></div><div class="sw"><i style="width:8px;height:8px;background:var(--primary);border:0;border-radius:2px"></i><b>8</b></div><div class="sw"><i style="width:12px;height:12px;background:var(--primary);border:0;border-radius:2px"></i><b>12</b></div><div class="sw"><i style="width:14px;height:14px;background:var(--primary);border:0;border-radius:2px"></i><b>14</b></div><div class="sw"><i style="width:20px;height:20px;background:var(--primary);border:0;border-radius:2px"></i><b>20</b></div><div class="sw"><i style="width:28px;height:28px;background:var(--primary);border:0;border-radius:2px"></i><b>28</b></div>
+<span style="width:24px"></span>
+<div class="sw"><i style="width:56px;height:40px;border-radius:8px;background:var(--surface);border:1px solid var(--border-strong)"></i><b>8 thumbs</b></div><div class="sw"><i style="width:56px;height:40px;border-radius:14px;background:var(--surface);border:1px solid var(--border-strong)"></i><b>14 cards, inputs</b></div><div class="sw"><i style="width:56px;height:40px;border-radius:20px;background:var(--surface);border:1px solid var(--border-strong)"></i><b>20 hero panels</b></div><div class="sw"><i style="width:56px;height:40px;border-radius:999px;background:var(--surface);border:1px solid var(--border-strong)"></i><b>pill buttons, tags</b></div>
+</div>
+<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0">Content max 1180px, left-aligned. Card padding 14–20px, gaps 12px. Controls 40px; hero input 46px; hit targets ≥ 44px.</p></section>
+
+<section id="glyphs"><h2>Glyphs &amp; labels</h2>
+<div class="row">
+<span class="pill" style="background:var(--ev-observed-bg);color:var(--ev-observed-fg)">● Observed</span><span class="pill" style="background:var(--ev-inferred-bg);color:var(--ev-inferred-fg)">◐ Inferred</span><span class="pill" style="border:1px dashed var(--ev-limited-border);color:var(--ev-limited-fg)">◔ Limited</span><span class="pill" style="border:1px solid var(--ev-unavailable-border);color:var(--ev-unavailable-fg)">○ Unavailable</span>
+<span class="pill" style="background:var(--primary-tint);color:var(--primary-deep);font-size:10px;letter-spacing:.06em;text-transform:uppercase">AI-drafted</span><span class="pill" style="border:1px solid var(--grey-300);color:var(--text-body);font-size:10px;letter-spacing:.06em;text-transform:uppercase">Rule-based</span><span class="pill" style="border:1px dashed var(--grey-300);color:var(--text-muted);font-size:9px;letter-spacing:.08em;text-transform:uppercase">Planned</span>
+<span style="font-size:13px;color:var(--text-body);margin-inline-start:8px">◆ you · │ median · ○ leader · ⚠ stopped · → next move · ↗ external · ▾▴ drawer</span></div>
+<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0">No icon font, no emoji. The only drawn icons are the Lucide thumbs inside FeedbackThumbs. The mark is <code>assets/logo-dot.png</code>; the name is set in type beside it.</p></section>
+
+<section id="components"><h2>Components</h2>
+<table><thead><tr><th>Group</th><th>Component</th><th>Use</th><th>Card</th></tr></thead><tbody>
+<tr><td>actions</td><td>Button · IconButton · FeedbackThumbs</td><td>Outlined pill actions (no solid fill); 28px square row controls; thumbs up/down per comparison.</td><td><a class="file" href="components/actions/actions.card.html">actions.card.html</a></td></tr>
+<tr><td>labels</td><td>EvidencePill · Tag · SourceTag</td><td>Provenance states; Preview / Example / Planned pills; AI-drafted vs Rule-based origin.</td><td><a class="file" href="components/labels/labels.card.html">labels.card.html</a></td></tr>
+<tr><td>navigation</td><td>Tabs · FilterChips · NavBar</td><td>Underline tabs with counts and dashed Planned tabs; single-select competitor chips; dot + name header.</td><td><a class="file" href="components/navigation/navigation.card.html">navigation.card.html</a></td></tr>
+<tr><td>forms</td><td>Input · Select · Segmented</td><td>40px fields, 14px radius, ink error text; pill segmented control for views and language.</td><td><a class="file" href="components/forms/forms.card.html">forms.card.html</a></td></tr>
+<tr><td>surfaces</td><td>Card · Dialog</td><td>Flat surface / raised / outline / dashed cards; the one elevated surface.</td><td><a class="file" href="components/surfaces/surfaces.card.html">surfaces.card.html</a></td></tr>
+<tr><td>data</td><td>DataTable · BenchmarkTrack · ProductMatchCard · ProgressPhases</td><td>Grid table with evidence drawer; you/median/leader track; one product vs its rivals; run phases.</td><td><a class="file" href="components/data/data.card.html">data.card.html</a></td></tr>
+</tbody></table>
+<p style="font-size:12px;color:var(--text-muted);margin:12px 0 0">Each component ships <code>Name.jsx</code>, <code>Name.d.ts</code> (props contract) and <code>Name.prompt.md</code> (usage). Mount from the compiled bundle namespace; the card HTML files show the variants.</p></section>
+
+<section id="kit"><h2>UI kit</h2>
+<div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+<div class="card"><p class="k">Landing</p><p style="margin:0;font-size:13px">Hero, domain input, pillars, pricing targets.</p></div>
+<div class="card"><p class="k">Progress</p><p style="margin:0;font-size:13px">Seven phases, auto-opens the report.</p></div>
+<div class="card"><p class="k">Report</p><p style="margin:0;font-size:13px">Decision header, Competitors, Products (by product / table), Benchmark.</p></div>
+<div class="card"><p class="k">Sign in</p><p style="margin:0;font-size:13px">Create / sign in, inline validation, Planned.</p></div>
+<div class="card"><p class="k">Account</p><p style="margin:0;font-size:13px">Reports, plan &amp; usage, profile, API keys, connected apps.</p></div>
+</div>
+<p style="margin:12px 0 0"><a class="file" href="ui_kits/10signals/index.html">Open the click-through →</a> <span style="font-size:12px;color:var(--text-muted)">· prototype with the explainer animation and Arabic: <a class="file" href="/">Live homepage</a></span></p></section>
+
+<section id="files"><h2>Files</h2>
+<ul>
+<li><code>styles.css</code> → <code>tokens/fonts.css · colors.css · typography.css · spacing.css · base.css</code></li>
+<li><code>readme.md</code> — full guide: content fundamentals, visual foundations, iconography, caveats. <code>SKILL.md</code> — agent entry point.</li>
+<li><code>guidelines/</code> — 14 specimen cards (Colors, Type, Spacing, Brand). <code>assets/logo-dot.png</code>.</li>
+<li><code>components/&lt;group&gt;/</code> — sources, contracts, prompts and one card per group. <code>components/_card_loader.js</code> — fallback when the bundle isn't compiled.</li>
+<li><code>ui_kits/10signals/</code> — <code>index.html</code>, five screen JSX files, README.</li>
+</ul></section>
+</div></body></html>

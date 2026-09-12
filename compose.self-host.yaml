@@ -1,0 +1,63 @@
+name: ten-signals-self-host
+x-app: &app
+  image: ten-signals-self-host:candidate
+  build:
+    context: .
+    dockerfile: Dockerfile.self-host
+  init: true
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  volumes:
+    - application-data:/data
+x-runtime: &runtime
+  MARKET_SIGNAL_MODE: self-hosted
+  MARKET_SIGNAL_DEPLOY_TARGET: node
+  MARKET_SIGNAL_EXECUTION_BACKEND: local
+  MARKET_SIGNAL_HOSTED_BILLING: "false"
+  MARKET_SIGNAL_SQLITE_PATH: /data/10signals.sqlite
+services:
+  web:
+    <<: *app
+    environment:
+      <<: *runtime
+      MARKET_SIGNAL_PROCESS_ROLE: app
+      BETTER_AUTH_URL: https://localhost:${SELF_HOST_HTTPS_PORT:-8443}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Run the setup first}
+      MARKET_SIGNAL_SELF_HOST_ALLOW_SIGNUP: ${MARKET_SIGNAL_SELF_HOST_ALLOW_SIGNUP:-false}
+  worker:
+    <<: *app
+    profiles: [research]
+    stop_grace_period: 10m
+    command: [node, --experimental-strip-types, scripts/local-worker.ts]
+    environment:
+      <<: *runtime
+      MARKET_SIGNAL_PROCESS_ROLE: worker
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    healthcheck:
+      disable: true
+    depends_on:
+      web:
+        condition: service_healthy
+  gateway:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SELF_HOST_HTTPS_PORT:-8443}:443"
+    environment:
+      SELF_HOST_HOSTNAME: ${SELF_HOST_HOSTNAME:-localhost}
+    volumes:
+      - ./deploy/self-host/Caddyfile:/etc/caddy/Caddyfile:ro
+      - gateway-data:/data
+      - gateway-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+volumes:
+  application-data:
+  gateway-data:
+  gateway-config:

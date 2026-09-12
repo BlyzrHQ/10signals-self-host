@@ -1,0 +1,51 @@
+:root {
+  /* Base palette (tweakcn "twitter" theme, light) */
+  --blue-50: #e8f5fe;
+  --blue-100: #cfe9fc;
+  --blue-500: #1d9bf0;
+  --blue-600: #1a8cd8;
+  --blue-700: #0b6cb0;
+  --ink-900: #0f1419;
+  --ink-700: #33404a;
+  --ink-500: #536471;
+  --ink-400: #6e767d;
+  --ink-300: #8b98a5;
+  --grey-300: #b9c4cb;
+  --grey-200: #cfd9de;
+  --grey-150: #e1e8ed;
+  --grey-100: #eff3f4;
+  --grey-50: #f7f9f9;
+  --white: #ffffff;
+
+  /* Semantic */
+  --bg: var(--white);
+  --surface: var(--grey-50);
+  --surface-raised: var(--white);
+  --surface-sunken: var(--grey-100);
+  --border: var(--grey-100);
+  --border-strong: var(--grey-200);
+  --border-dashed: var(--grey-300);
+  --text: var(--ink-900);
+  --text-body: var(--ink-700);
+  --text-muted: var(--ink-500);
+  --text-faint: var(--ink-400);
+  --text-placeholder: var(--ink-300);
+  --primary: var(--blue-500);
+  --primary-hover: var(--blue-600);
+  --primary-deep: var(--blue-700);
+  --primary-tint: var(--blue-50);
+  --primary-ring: rgba(29, 155, 240, 0.25);
+  --hover-wash: var(--grey-100);
+  --ink-fill: var(--ink-900);
+  --on-ink: var(--white);
+
+  /* Evidence states — the only "status" colors. No red/green. */
+  --ev-observed-bg: var(--ink-900);
+  --ev-observed-fg: var(--white);
+  --ev-inferred-bg: var(--blue-50);
+  --ev-inferred-fg: var(--blue-700);
+  --ev-limited-fg: var(--ink-700);
+  --ev-limited-border: var(--ink-500);
+  --ev-unavailable-fg: var(--ink-500);
+  --ev-unavailable-border: var(--grey-300);
+}

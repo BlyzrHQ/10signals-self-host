@@ -1,0 +1,192 @@
+import { profileTerms } from "./business-profile.ts";
+import type { DiscoveryCandidate } from "./competitor-discovery.ts";
+import { buildProductPairCandidateIndex, retrieveProductPairCandidates, scoreProductPair, type ProductRecord } from "./product-intelligence.ts";
+import { regionCode, strictRegionCode } from "./region-inference.ts";
+
+export type FirstPartyRegionSource = "first-party-observed" | "first-party-inferred";
+export type VerificationRegionSource = "discovery-inferred" | "primary-first-party-observed" | "primary-first-party-inferred";
+
+export type VerificationMarket = {
+  region: string;
+  regionCode: string;
+  source: VerificationRegionSource;
+};
+
+export type VerificationSite = {
+  domain: string;
+  title: string;
+  description: string;
+  region: string;
+  regionEvidenceSource?: FirstPartyRegionSource;
+  countryTldRegionCode?: string;
+  headings?: string[];
+  products: ProductRecord[];
+};
+
+export type CompetitorVerification = {
+  accepted: boolean;
+  verificationScore: number;
+  confidence: "High" | "Medium" | "Low";
+  categoryAlignment: boolean;
+  regionCompatibility: boolean;
+  primaryRegionKnown: boolean;
+  candidateRegionKnown: boolean;
+  targetRegion: string;
+  targetRegionCode: string;
+  targetRegionSource: VerificationRegionSource;
+  candidateRegion: string;
+  candidateRegionCode: string;
+  candidateCombinedRegionCode: string;
+  candidateRegionSource: FirstPartyRegionSource;
+  candidateRegionBasis: "country-code-storefront" | "combined-first-party";
+  regionDecisionReason: string;
+  overlapTerms: string[];
+  hasProductOverlap: boolean;
+  categoryBasis: "observed-core" | "observed-locale-pair" | "verified-exact-product-pair" | "none";
+  exactProductPairVerified: boolean;
+  provenPrimaryProduct?: ProductRecord;
+  provenRivalProduct?: ProductRecord;
+};
+
+export function resolveVerificationMarket(
+  discoveryRegion: string,
+  primaryRegion: string,
+  primaryRegionSource: FirstPartyRegionSource = "first-party-inferred",
+): VerificationMarket {
+  const discoveryCode = strictRegionCode(discoveryRegion);
+  if (discoveryCode && discoveryCode !== "GLOBAL") {
+    return { region: discoveryRegion, regionCode: discoveryCode, source: "discovery-inferred" };
+  }
+  return {
+    region: primaryRegion,
+    regionCode: regionCode(primaryRegion),
+    source: primaryRegionSource === "first-party-observed" ? "primary-first-party-observed" : "primary-first-party-inferred",
+  };
+}
+
+const GENERIC = new Set([
+  "business", "company", "delivery", "digital", "market", "marketplace", "online", "platform", "service", "services", "shop", "software", "store", "solutions",
+]);
+const ACCESSORY = /\b(?:accessories|accessory|bags?|cases?|chargers?|covers?|holders?|mounts?|parts?|straps?)\b/i;
+
+function observedProductTerms(products: ProductRecord[]) {
+  return products.slice(0, 30).flatMap((product) => [
+    product.name,
+    ...(product.aliases || []).map((alias) => alias.name),
+    product.category,
+    product.description,
+  ]);
+}
+
+function siteTerms(site: VerificationSite) {
+  return new Set(profileTerms([
+    site.title,
+    site.description,
+    ...(site.headings || []).slice(0, 12),
+    ...observedProductTerms(site.products),
+  ].join(" ")).filter((term) => !GENERIC.has(term)));
+}
+
+function strongestProductPair(primary: ProductRecord[], candidate: ProductRecord[]) {
+  const index = buildProductPairCandidateIndex(candidate);
+  return primary.flatMap((left) => retrieveProductPairCandidates(left, index).map((right) => ({ left, right, ...scoreProductPair(left, right) })))
+    .filter((pair) => pair.eligible)
+    .sort((left, right) => right.score - left.score || left.left.name.localeCompare(right.left.name))[0];
+}
+
+export function verifyCompetitorEntity(
+  primary: VerificationSite,
+  candidate: VerificationSite,
+  discovery: DiscoveryCandidate,
+  targetMarket: VerificationMarket = resolveVerificationMarket("", primary.region, primary.regionEvidenceSource),
+  options: {
+    requireProductOverlap?: boolean;
+    verifiedExactProductPair?: { primary: ProductRecord; rival: ProductRecord; confidence: number };
+  } = {},
+): CompetitorVerification {
+  const primaryTerms = siteTerms(primary);
+  const candidateTerms = siteTerms(candidate);
+  const overlapTerms = [...primaryTerms].filter((term) => candidateTerms.has(term)).sort().slice(0, 16);
+  const discoveryTerms = profileTerms(`${discovery.marketCategory} ${discovery.sharedOfferings.join(" ")}`).filter((term) => !GENERIC.has(term));
+  const ownSiteDiscoveryOverlap = discoveryTerms.filter((term) => candidateTerms.has(term));
+  const deterministicPair = strongestProductPair(primary.products, candidate.products);
+  const exactPair = options.verifiedExactProductPair;
+  const pair = exactPair
+    ? { left: exactPair.primary, right: exactPair.rival, score: exactPair.confidence, eligible: true }
+    : deterministicPair;
+  const hasProductOverlap = Boolean(pair);
+
+  const primaryCore = profileTerms(`${primary.title} ${primary.description} ${(primary.headings || []).slice(0, 8).join(" ")}`).filter((term) => !GENERIC.has(term));
+  const candidateCore = profileTerms(`${candidate.title} ${candidate.description} ${(candidate.headings || []).slice(0, 8).join(" ")}`).filter((term) => !GENERIC.has(term));
+  const coreOverlap = primaryCore.filter((term) => candidateCore.includes(term));
+  const accessoryOnly = ACCESSORY.test(`${candidate.title} ${candidate.description}`) && coreOverlap.length < 2;
+  const matchedPairHasLocaleBridge = Boolean(pair && [pair.left, pair.right].some((product) => (product.aliases || []).some((alias) => alias.locale !== "und" && alias.normalizedName !== product.normalizedName)));
+  const localizedProductBridge = matchedPairHasLocaleBridge && ownSiteDiscoveryOverlap.length >= 2;
+  const verifiedExactProductPair = Boolean(exactPair && exactPair.confidence >= 0.8);
+  const categoryAlignment = !accessoryOnly && (coreOverlap.length >= 2 || localizedProductBridge || verifiedExactProductPair);
+  const categoryBasis: CompetitorVerification["categoryBasis"] = coreOverlap.length >= 2
+    ? "observed-core"
+    : localizedProductBridge
+      ? "observed-locale-pair"
+      : verifiedExactProductPair
+        ? "verified-exact-product-pair"
+        : "none";
+
+  const primaryRegion = targetMarket.regionCode;
+  const candidateCombinedRegion = regionCode(candidate.region);
+  const candidateCountryTldRegion = candidate.countryTldRegionCode || "";
+  const candidateRegion = candidateCountryTldRegion || candidateCombinedRegion;
+  const regionCompatibility = !primaryRegion || !candidateRegion || primaryRegion === candidateRegion || primaryRegion === "GLOBAL" || candidateRegion === "GLOBAL";
+  const candidateRegionSource = candidateCountryTldRegion ? "first-party-observed" : candidate.regionEvidenceSource || "first-party-inferred";
+  const candidateRegionBasis = candidateCountryTldRegion ? "country-code-storefront" : "combined-first-party";
+  const candidateRegionDescription = candidateCountryTldRegion
+    ? `candidate country-code storefront ${candidate.domain} resolves to ${candidateRegion} (first-party-observed); combined page signals resolved ${candidateCombinedRegion || "unknown"}`
+    : `candidate region ${candidateRegion || "unknown"} (${candidateRegionSource})`;
+  const regionDecisionReason = !primaryRegion
+    ? `Target market is unknown (${targetMarket.source}); ${candidateRegionDescription} and remains neutral.`
+    : !candidateRegion
+      ? `Target market ${primaryRegion} (${targetMarket.source}); ${candidateRegionDescription} and remains neutral.`
+      : regionCompatibility
+        ? `Target market ${primaryRegion} (${targetMarket.source}) is compatible with ${candidateRegionDescription}.`
+        : `Target market ${primaryRegion} (${targetMarket.source}) conflicts with ${candidateRegionDescription}.`;
+
+  const categoryScore = categoryAlignment ? Math.min(45, 30 + (coreOverlap.length * 4)) : 0;
+  const productScore = pair ? Math.min(25, 14 + Math.round(pair.score * 20)) : Math.min(10, ownSiteDiscoveryOverlap.length * 3);
+  const evidenceScore = Math.min(12, Math.max(discovery.mentionCount, discovery.evidence.length) * 4);
+  const relationshipScore = discovery.relationship === "direct" ? 8 : 3;
+  const regionScore = primaryRegion && candidateRegion ? (regionCompatibility ? 10 : 0) : 5;
+  const verificationScore = Math.min(100, categoryScore + productScore + evidenceScore + relationshipScore + regionScore);
+  const accepted = categoryAlignment && regionCompatibility && verificationScore >= 50 && (!options.requireProductOverlap || hasProductOverlap);
+  const confidence = verificationScore >= 78 && hasProductOverlap ? "High" : verificationScore >= 55 ? "Medium" : "Low";
+
+  return {
+    accepted,
+    verificationScore,
+    confidence,
+    categoryAlignment,
+    regionCompatibility,
+    primaryRegionKnown: Boolean(primaryRegion),
+    candidateRegionKnown: Boolean(candidateRegion),
+    targetRegion: targetMarket.region,
+    targetRegionCode: primaryRegion,
+    targetRegionSource: targetMarket.source,
+    candidateRegion: candidate.region,
+    candidateRegionCode: candidateRegion,
+    candidateCombinedRegionCode: candidateCombinedRegion,
+    candidateRegionSource,
+    candidateRegionBasis,
+    regionDecisionReason,
+    overlapTerms,
+    hasProductOverlap,
+    categoryBasis,
+    exactProductPairVerified: verifiedExactProductPair,
+    provenPrimaryProduct: pair?.left,
+    provenRivalProduct: pair?.right,
+  };
+}
+
+export function compareVerifiedCompetitors(left: CompetitorVerification, right: CompetitorVerification) {
+  return Number(right.accepted) - Number(left.accepted)
+    || Number(right.accepted && right.hasProductOverlap) - Number(left.accepted && left.hasProductOverlap)
+    || right.verificationScore - left.verificationScore;
+}

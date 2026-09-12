@@ -1,0 +1,173 @@
+/* design-landing: landing, /pricing and /how-it-works layout for the supplied 10 Signals design.
+   Values mirror the prototype's inline styles 1:1; colors come from design-system.css tokens. */
+
+/* Legacy globals.css caps every h1 at 580px; the design has no cap. */
+.ds-page .ds-h1 { max-width: none; }
+
+/* ---------- Hero ---------- */
+.ds-hero { padding: 56px 0 56px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+.ds-hero-form { display: flex; gap: 8px; max-width: 600px; }
+.ds-hero-form .ds-input { flex: 1; min-width: 0; }
+.ds-hero-note { margin: 12px 0 0; }
+.ds-hero-error { margin-top: 12px; max-width: 600px; }
+
+/* Research controls: real product options rendered quietly in the hero note style (.ds-check). */
+.ds-hero-research { margin-top: 8px; max-width: 600px; }
+.ds-hero-research .report-research-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; border: 0; border-radius: 0; padding: 0; margin: 0; min-width: 0; text-align: start; }
+.ds-hero-research .report-research-controls legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; padding: 0; }
+.ds-hero-research .report-research-controls .research-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ds-muted-2); cursor: pointer; }
+.ds-hero-research .report-research-controls input[type=checkbox] { width: 13px; height: 13px; accent-color: var(--ds-accent); margin: 0; }
+.ds-hero-research .report-research-controls .research-tolerance { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ds-muted-2); }
+.ds-hero-research .report-research-controls input[type=number] { width: 52px; border: 1px solid var(--ds-line-2); border-radius: 8px; background: var(--ds-bg); color: var(--ds-ink); padding: 2px 6px; font: inherit; font-size: 12px; }
+.ds-hero-research .report-research-controls p { flex-basis: 100%; margin: 0; font-size: 12px; line-height: 1.5; color: var(--ds-muted-2); }
+.ds-hero-research .report-research-controls input:focus-visible { outline: 2px solid var(--ds-focus); outline-offset: 2px; }
+
+/* ---------- Explainer animation (440×360 design box scaled to its container) ---------- */
+.ms-anim-frame { container-type: inline-size; width: 100%; max-width: 440px; aspect-ratio: 440 / 360; justify-self: end; direction: ltr; overflow: hidden; border-radius: 20px; }
+.ms-anim { position: relative; width: 440px; height: 360px; transform-origin: 0 0; transform: scale(calc(100cqw / 440px)); background: var(--ds-soft); border: 1px solid var(--ds-line); border-radius: 20px; overflow: hidden; font-size: 11px; color: var(--ds-ink); text-align: left; }
+.ms-anim .ms-num { font-weight: 600; font-variant-numeric: tabular-nums; }
+.ms-domain { position: absolute; left: 22px; top: 22px; display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; background: var(--ds-bg); border: 1px solid var(--ds-line-2); border-radius: var(--ds-pill); font-size: 12px; }
+.ms-domain-url { white-space: nowrap; }
+.ms-url-character { position: relative; opacity: 0; animation: ms-type-character 14s linear infinite; }
+.ms-url-character::before { content: ""; position: absolute; left: 0; top: 0; height: 1.1em; border-left: 1px solid var(--ds-accent); opacity: 0; animation: ms-type-caret 14s linear infinite; animation-delay: inherit; }
+@keyframes ms-type-character { 0%, 84% { opacity: 1; } 85%, 100% { opacity: 0; } }
+@keyframes ms-type-caret { 0%, .7% { opacity: 1; } .8%, 100% { opacity: 0; } }
+.ms-domain-dot { position: relative; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ds-accent); }
+.ms-domain-dot::after { content: ""; position: absolute; inset: -3px; border: 1px solid var(--ds-accent); border-radius: 50%; animation: ms-beacon 2.4s ease-out infinite; }
+@keyframes ms-beacon { 0% { transform: scale(.5); opacity: .65; } 80%, 100% { transform: scale(1.8); opacity: 0; } }
+.ms-catalog { position: absolute; left: 22px; top: 70px; display: grid; gap: 6px; }
+.ms-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: 10px; width: 180px; }
+.ms-thumb { width: 22px; height: 22px; border-radius: 6px; background: var(--ds-line); flex: none; }
+.ms-row-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-scan { position: absolute; left: 22px; top: 70px; width: 180px; height: 2px; background: linear-gradient(to right, transparent, var(--ds-accent), transparent); animation: ms-scan 14s infinite both; }
+.ms-lines { position: absolute; inset: 0; pointer-events: none; }
+.ms-line { fill: none; stroke: #8bb8d2; stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 200; animation: ms-draw 14s infinite both; }
+.ms-signal-stream { position: absolute; inset: 0; pointer-events: none; }
+.ms-signal-packet { position: absolute; top: 0; left: 0; width: 5px; height: 5px; border-radius: 50%; background: var(--ds-accent); box-shadow: 0 0 0 3px #1d9bf018; animation: ms-transmit 2.4s linear infinite; }
+.ms-packet-1 { offset-path: path("M160 38 C 230 38, 230 52, 290 52"); }
+.ms-packet-2 { offset-path: path("M160 38 C 230 38, 230 88, 290 88"); animation-delay: .4s; }
+.ms-packet-3 { offset-path: path("M160 38 C 230 38, 230 124, 290 124"); animation-delay: .8s; }
+@keyframes ms-transmit { 0% { offset-distance: 0%; opacity: 0; } 10%, 80% { opacity: 1; } 95%, 100% { offset-distance: 100%; opacity: 0; } }
+.ms-line-accent { stroke: var(--ds-accent); animation: ms-draw2 14s infinite both; }
+.ms-rivals { position: absolute; left: 290px; top: 40px; display: grid; gap: 12px; }
+.ms-rival { display: flex; align-items: center; gap: 6px; padding: 4px 9px; background: var(--ds-bg); border: 1px solid var(--ds-line-2); border-radius: var(--ds-pill); white-space: nowrap; }
+.ms-rival b { font-weight: 600; }
+.ms-rival-ink { color: var(--ds-ink); }
+.ms-rival-inferred { color: var(--ds-accent-deep); }
+.ms-match { position: absolute; left: 290px; top: 160px; width: 130px; }
+.ms-row-match { width: auto; border-color: var(--ds-accent); }
+.ms-verdict { margin-top: 12px; display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: var(--ds-pill); background: var(--ds-ink); color: #ffffff; font-size: 10px; }
+.ms-report { position: absolute; left: 22px; right: 22px; top: 252px; padding: 10px 12px; background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: 14px; }
+.ms-report-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ms-complete { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: var(--ds-pill); background: var(--ds-ink); color: #ffffff; }
+.ms-report-meta { color: var(--ds-muted); }
+.ms-report-bar { display: flex; align-items: center; gap: 8px; color: var(--ds-muted); }
+.ms-report-label { width: 96px; }
+.ms-bar { flex: 1; height: 6px; background: var(--ds-line); border-radius: 3px; overflow: hidden; position: relative; }
+.ms-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ds-accent); border-radius: 3px; animation: ms-fill 14s infinite both; }
+.ms-bar-value { font-weight: 600; color: var(--ds-ink); }
+.ms-captions { position: absolute; left: 22px; right: 22px; bottom: 14px; height: 16px; color: var(--ds-muted); font-size: 11px; }
+.ms-caption { position: absolute; left: 0; white-space: nowrap; }
+.ms-stage-1 { animation: ms-s1 14s infinite both; }
+.ms-stage-2 { animation: ms-s2 14s infinite both; }
+.ms-stage-3 { animation: ms-s3 14s infinite both; }
+.ms-stage-4 { animation: ms-s4 14s infinite both; }
+.ms-stage-5 { animation: ms-s5 14s infinite both; }
+.ms-caption-1 { animation: ms-c1 14s infinite both; }
+.ms-caption-2 { animation: ms-c2 14s infinite both; }
+.ms-caption-3 { animation: ms-c3 14s infinite both; }
+.ms-caption-4 { animation: ms-c4 14s infinite both; }
+.ms-caption-5 { animation: ms-c5 14s infinite both; }
+@media (prefers-reduced-motion: reduce) {
+  .ms-signal-stream { display: none; }
+  .ms-url-character::before { display: none; animation: none; }
+  .ms-domain-dot::after { animation: none; display: none; }
+  .ms-anim .ms-caption { position: static; display: block; }
+  .ms-anim .ms-captions { height: auto; display: grid; }
+  .ms-anim .ms-bar-fill { width: 60%; }
+}
+
+/* ---------- Pillars ---------- */
+.ds-pillars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 64px; }
+.ds-pillar .ds-kicker { margin: 0 0 8px; }
+.ds-pillar-body { margin: 0; font-size: 14px; color: var(--ds-ink-2); }
+
+/* ---------- Section headings ---------- */
+.ds-section-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.ds-section-note { font-size: 11px; color: var(--ds-muted); }
+
+/* ---------- Proof card ---------- */
+.ds-proof { margin-bottom: 64px; }
+.ds-proof-card { border: 1px solid var(--ds-line-2); border-radius: 20px; padding: 18px 20px; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 20px; }
+.ds-proof-head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.ds-proof-source { font-size: 11px; color: var(--ds-muted); }
+.ds-proof-headline { font-size: 17px; margin: 0 0 6px; text-wrap: pretty; }
+.ds-proof-meta { font-size: 12px; color: var(--ds-muted); margin: 0; }
+.ds-proof-cell { border-inline-start: 1px solid var(--ds-line); padding-inline-start: 20px; }
+.ds-proof-cell .ds-kicker { margin: 0 0 6px; }
+.ds-proof-value { font-size: 15px; margin: 0; }
+.ds-proof-sub { font-size: 12px; color: var(--ds-muted); margin: 2px 0 0; }
+.ds-proof-footnote { margin-top: 10px; }
+
+/* ---------- How it works ---------- */
+.ds-how { margin-bottom: 64px; max-width: 820px; }
+.ds-how-title { margin: 0 0 18px; }
+.ds-how-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; }
+.ds-how-step { display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--ds-line); }
+.ds-how-n { font-size: 12px; color: var(--ds-accent); }
+.ds-how-step-title { margin: 0 0 2px; font-size: 15px; }
+.ds-how-step-body { margin: 0; font-size: 13px; color: var(--ds-muted); }
+
+/* ---------- Pricing ---------- */
+.ds-pricing { max-width: 820px; }
+.ds-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.ds-plan { display: flex; flex-direction: column; }
+.ds-plan-name { margin: 0 0 6px; }
+.ds-plan-price { font-size: 26px; font-weight: 600; margin: 0 0 4px; text-align: start; }
+.ds-plan-unit { font-size: 12px; color: var(--ds-muted); margin: 0 0 10px; }
+.ds-plan-body { font-size: 13px; color: var(--ds-ink-2); margin: 0; }
+.ds-plan-action { margin-top: auto; padding-top: 14px; }
+.ds-plan-action .ds-btn { width: 100%; }
+.ds-plan-action .checkout-action { display: grid; gap: 6px; }
+/* Legacy global .checkout-action button rules (globals.css / site-design.css) outrank .ds-btn; restate the pill here. */
+.ds-plan-action .checkout-action button.ds-btn { width: 100%; min-height: 34px; padding: 6px 12px; border: 1px solid var(--ds-line-2); border-radius: var(--ds-pill); background: transparent; color: var(--ds-ink); font-size: 13px; font-weight: 400; gap: 6px; filter: none; }
+.ds-plan-action .checkout-action button.ds-btn:hover { background: var(--ds-ink-hover); color: var(--ds-ink); filter: none; }
+.ds-plan-action .checkout-action button.ds-btn:disabled { opacity: .55; }
+.ds-plan-action .checkout-action small { font-size: 12px; line-height: 1.4; color: var(--ds-ink-2); }
+.ds-pricing-note { margin: 14px 0 0; }
+
+/* ---------- Standalone routes (/pricing, /how-it-works) ---------- */
+.ds-standalone-hero { padding: 56px 0 40px; max-width: 820px; }
+.ds-standalone-hero .ds-kicker { margin: 0 0 12px; }
+.ds-standalone-hero .ds-h1 { margin: 0 0 14px; font-size: 36px; }
+.ds-standalone-hero p:not(.ds-kicker) { margin: 0; font-size: 15px; color: var(--ds-ink-2); max-width: 640px; }
+.ds-method-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; max-width: 820px; margin-bottom: 64px; }
+.ds-method-cards .ds-kicker { margin: 0 0 8px; }
+.ds-method-cards p:not(.ds-kicker) { margin: 0; font-size: 14px; color: var(--ds-ink-2); }
+.ds-method-cards a { display: inline-block; margin-top: 10px; font-size: 13px; }
+.ds-method-cards pre { margin: 10px 0 0; padding: 10px 12px; background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: 10px; font-family: var(--ds-mono); font-size: 12px; color: var(--ds-ink); direction: ltr; text-align: left; overflow-x: auto; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .ds-hero { grid-template-columns: minmax(0, 1fr); gap: 32px; padding: 40px 0 48px; }
+  .ms-anim-frame { justify-self: stretch; max-width: none; }
+  .ds-proof-card { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .ds-proof-cell { border-inline-start: 0; padding-inline-start: 0; border-top: 1px solid var(--ds-line); padding-top: 14px; }
+}
+@media (max-width: 700px) {
+  .ds-hero-form { flex-direction: column; }
+  .ds-hero-form .ds-btn { width: 100%; }
+  .ds-pillars { grid-template-columns: minmax(0, 1fr); margin-bottom: 48px; }
+  .ds-plans { grid-template-columns: minmax(0, 1fr); }
+  .ds-method-cards { grid-template-columns: minmax(0, 1fr); }
+  .ds-proof, .ds-how { margin-bottom: 48px; }
+  .ds-how-step { grid-template-columns: 32px 1fr; gap: 10px; }
+  .ds-standalone-hero { padding: 32px 0 28px; }
+  .ds-standalone-hero .ds-h1 { font-size: 28px; }
+}
+/* Quiet project attribution beneath the landing-page content. */
+.ds-project-footer { border-top: 1px solid #eff3f4; padding: 24px 16px; text-align: center; color: #536471; font-size: 13px; }
+.ds-project-footer p { margin: 0; }
+.ds-project-footer a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.ds-project-footer a:hover { color: #1d9bf0; }
+.ds-project-footer a:focus-visible { outline: 2px solid #1d9bf0; outline-offset: 4px; border-radius: 2px; }

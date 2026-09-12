@@ -1,0 +1,13 @@
+<!-- @dsCard group="Components" viewport="700x230" subtitle="Card variants and an inline Dialog" name="Surfaces" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Surfaces</title><link rel="stylesheet" href="../../styles.css"><style>body{padding:14px 18px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}</style>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script><script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script><script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script><script src="../_card_loader.js"></script></head><body><div id="root"></div>
+<script type="text/babel" data-presets="react">loadNS('../', ["actions/Button.jsx","actions/IconButton.jsx","actions/FeedbackThumbs.jsx","labels/EvidencePill.jsx","labels/Tag.jsx","labels/SourceTag.jsx","navigation/Tabs.jsx","navigation/FilterChips.jsx","navigation/NavBar.jsx","forms/Input.jsx","forms/Select.jsx","forms/Segmented.jsx","surfaces/Card.jsx","surfaces/Dialog.jsx","data/DataTable.jsx","data/BenchmarkTrack.jsx","data/ProgressPhases.jsx","data/ProductMatchCard.jsx"]).then(() => {
+const { Card, Dialog, Button, EvidencePill } = window.NS;
+function App(){ return <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+<Card kicker="Largest proven gap" title="Trust readiness" meta="22 points behind market median"/>
+<Card variant="raised" padding="12px 14px"><p style={{margin:0,fontSize:13}}>Raised row inside a surface</p><p style={{margin:'4px 0 0',fontSize:11,color:'var(--text-faint)'}}>hairline, white</p></Card>
+<Card variant="dashed" kicker="Planned · Tab 4" title="Advertising"><p style={{margin:0,fontSize:12,color:'var(--text-muted)'}}>Dashed frame for proposals.</p></Card>
+<div style={{gridColumn:'1/-1',position:'relative',height:110,background:'var(--surface-sunken)',borderRadius:14,overflow:'hidden'}}>
+  <div style={{position:'absolute',inset:0,background:'rgba(15,20,25,.35)',display:'grid',placeItems:'center'}}><div role="dialog" style={{width:360,background:'var(--surface-raised)',borderRadius:20,boxShadow:'var(--shadow-md)',padding:'14px 16px'}}><h2 style={{margin:'0 0 4px',fontSize:15,fontWeight:600}}>Share link</h2><p style={{margin:0,fontSize:12,color:'var(--text-body)'}}>Unlisted, not permissioned. Anyone with the link can view.</p><div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:10}}><Button variant="secondary" size="sm">Cancel</Button><Button size="sm">Copy link</Button></div></div></div>
+</div></div>; }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);});</script></body></html>

@@ -1,7 +1,35 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import type { DocGuide } from "../lib/docs-catalog";
+import { searchDocGuides, type DocGuide } from "../lib/docs-catalog";
+
+const directorySections = [
+  { title: "Choose your path", description: "Start with the way you want to use 10Signals.", slugs: ["using-10signals", "hosted", "self-host"] },
+  { title: "Build and connect", description: "CLI, API and agent access. Connecting a client does not install the service.", slugs: ["trigger-cli", "own-trigger", "api", "mcp"] },
+  { title: "Configuration and help", description: "Credentials, providers and checks when something does not work.", slugs: ["ai-provider", "trigger-credentials", "credentials", "troubleshooting"] },
+];
+
+export function DocsDirectory({ guides }: { guides: DocGuide[] }) {
+  const [query, setQuery] = useState("");
+  const matches = searchDocGuides(guides, query);
+  return <>
+    <div className="docs-search"><label htmlFor="docs-search">Search the guides</label><div>
+      <input id="docs-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Try API key, Docker, MCP or Trigger…" />
+      {query && <button type="button" onClick={() => setQuery("")}>Clear search</button>}
+    </div><p role="status" aria-live="polite">{query.trim() ? `${matches.length} ${matches.length === 1 ? "guide" : "guides"} found` : "Find setup instructions, commands and troubleshooting."}</p></div>
+    {directorySections.map(section => {
+      const visible = section.slugs.map(slug => matches.find(guide => guide.slug === slug)).filter((guide): guide is DocGuide => !!guide);
+      if (!visible.length) return null;
+      return <section className="docs-directory-section" key={section.title}><h2>{section.title}</h2><p>{section.description}</p><div className="docs-paths">
+        {visible.map(guide => <Link className="docs-path" href={`/docs/${guide.slug}`} key={guide.slug}>
+          <span className="docs-badge">{guide.status}</span><h3>{guide.title}</h3><p>{guide.summary}</p>
+          <span className="docs-path-link">Open guide <span aria-hidden="true">↗</span></span>
+        </Link>)}
+      </div></section>;
+    })}
+    {!matches.length && <p className="docs-empty">No guide matches that search. Try a shorter term, or clear the search to see every path.</p>}
+  </>;
+}
 
 export function GuideSteps({ guide }: { guide: DocGuide }) {
   const [windows, setWindows] = useState(true);

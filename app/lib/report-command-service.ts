@@ -1,5 +1,5 @@
 import { hostedBillingEnabled } from "./billing-plans.ts";
-import { selfHostedEnabled } from "./self-host-config.ts";
+import { localExecutionEnabled, selfHostedEnabled } from "./self-host-config.ts";
 import {
   finishReportReservation,
   openBillingDatabase,
@@ -59,6 +59,7 @@ export type ReportCommandInput = {
 };
 
 export type ReportCommandDependencies = {
+  preflight?: (actor?: ReportCommandActor) => string | null | Promise<string | null>;
   create: unknown;
   dispatch: typeof dispatchReportJob;
   markDispatched: typeof markReportDispatched;
@@ -71,7 +72,7 @@ export type ReportCommandFailure = {
   ok: false;
   status: 400 | 402 | 409 | 429 | 503;
   error: string;
-  errorCode: "invalid-domain" | "subscription-required" | "idempotency-conflict" | "report-limit-reached" | "storage-create-failed" | "dispatch-failed" | "report-create-failed";
+  errorCode: "invalid-domain" | "subscription-required" | "idempotency-conflict" | "report-limit-reached" | "storage-create-failed" | "dispatch-failed" | "report-create-failed" | "research-setup-required";
   publicId?: string;
   usage?: { used: number; limit: number };
   diagnosticCode?: string;
@@ -185,6 +186,11 @@ async function consumeReportCreation(
 
 export function reportCommandDependencies(environment: Record<string, string | undefined> = process.env): ReportCommandDependencies {
   const dependencies: ReportCommandDependencies = {
+    ...(localExecutionEnabled(environment) && (environment.MARKET_SIGNAL_LOCAL_HTTP === "true" || environment.MARKET_SIGNAL_ACCOUNT_PROVIDER === "true") ? { preflight: async (actor?: ReportCommandActor) => {
+      const { localResearchSetupMessage, localResearchStatus, accountResearchSetupMessage } = await import("./local-report-dispatch.ts");
+      if (environment.MARKET_SIGNAL_ACCOUNT_PROVIDER === "true") return accountResearchSetupMessage(actor, environment);
+      return localResearchSetupMessage(localResearchStatus(environment));
+    } } : {}),
     create: async (input: { primaryDomain: string; locale?: "en" | "ar"; entitlement?: { plan: ProductPlan; productLimit: number }; workspaceId?: string; billingReservationId?: string; commandId?: string; researchOptions?: ReportResearchOptions }) => createReportRunResult({
       ...input,
       entitlement: input.entitlement || resolveProductEntitlement(input.primaryDomain, {
@@ -220,6 +226,8 @@ export async function createReportCommand(input: ReportCommandInput, services: R
   let reservationId = "";
   let publicId = "";
   try {
+    const setupMessage = await services.preflight?.(input.actor);
+    if (setupMessage) return { ok: false, status: 503, error: setupMessage, errorCode: "research-setup-required", stage: "request" };
     const researchOptions = parseReportResearchOptions({ engine: "direct-trigger", includeAnalysis: input.includeAnalysis ?? false,
       ...(input.closePricePercent !== undefined ? { closePricePercent: input.closePricePercent } : {}) });
     if (input.actor && services.reserve) {

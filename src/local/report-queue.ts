@@ -25,6 +25,8 @@ export class LocalReportQueue {
     if (!columns.has("confirmed")) this.database.exec("ALTER TABLE local_report_jobs ADD COLUMN confirmed INTEGER NOT NULL DEFAULT 0");
     if (!columns.has("terminal_notified")) this.database.exec("ALTER TABLE local_report_jobs ADD COLUMN terminal_notified INTEGER NOT NULL DEFAULT 0");
     if (!columns.has("notify_after")) this.database.exec("ALTER TABLE local_report_jobs ADD COLUMN notify_after INTEGER NOT NULL DEFAULT 0");
+    const presenceColumns = this.database.prepare("PRAGMA table_info(local_worker_presence)").all() as Array<{ name: string }>;
+    if (!presenceColumns.some(column => column.name === "research_enabled")) this.database.exec("ALTER TABLE local_worker_presence ADD COLUMN research_enabled INTEGER NOT NULL DEFAULT 1");
   }
   close() { this.database.close(); }
   private storedPayload(row: {id:string;payload:string}) {
@@ -46,12 +48,19 @@ export class LocalReportQueue {
   deferNotification(id: string) { this.database.prepare("UPDATE local_report_jobs SET notify_after=? WHERE id=?").run(Date.now()+60_000,id); }
   expireUnconfirmed(now=Date.now()) { this.database.prepare("UPDATE local_report_jobs SET status='failed',error_code='dispatch-unconfirmed',updated_at=? WHERE status='queued' AND confirmed=0 AND created_at<?").run(now,now-300_000); }
   markNotified(id: string) { this.database.prepare("UPDATE local_report_jobs SET terminal_notified=1 WHERE id=? AND status IN ('failed','interrupted')").run(id); }
-  noteWorkerReady(now = Date.now()) {
-    this.database.prepare("INSERT INTO local_worker_presence(id,seen_at) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET seen_at=excluded.seen_at").run(now);
+  failQueuedWithoutProvider() {
+    this.database.prepare("UPDATE local_report_jobs SET status='failed',error_code='provider-not-configured',updated_at=? WHERE status='queued'").run(Date.now());
+  }
+  noteWorkerReady(now = Date.now(), researchEnabled = true) {
+    this.database.prepare("INSERT INTO local_worker_presence(id,seen_at,research_enabled) VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET seen_at=excluded.seen_at,research_enabled=excluded.research_enabled").run(now, Number(researchEnabled));
+  }
+  workerStatus(now = Date.now()): "ready" | "disabled" | "unavailable" {
+    const row = this.database.prepare("SELECT seen_at,research_enabled FROM local_worker_presence WHERE id=1").get() as { seen_at: number; research_enabled: number } | undefined;
+    if (!row || row.seen_at > now || row.seen_at <= now - 30_000) return "unavailable";
+    return row.research_enabled ? "ready" : "disabled";
   }
   workerReady(now = Date.now()) {
-    const row = this.database.prepare("SELECT seen_at FROM local_worker_presence WHERE id=1").get() as { seen_at: number } | undefined;
-    return Boolean(row && row.seen_at <= now && row.seen_at > now - 30_000);
+    return this.workerStatus(now) === "ready";
   }
   enqueue(input: unknown, now = Date.now()) {
     const payload = parseWebDirectReportPayload(input);

@@ -2,33 +2,39 @@ import { setTimeout as delay } from "node:timers/promises";
 import { localExecutionEnabled } from "../app/lib/self-host-config.ts";
 import { localQueuePath } from "../app/lib/local-report-dispatch.ts";
 import { LocalReportQueue } from "../src/local/report-queue.ts";
-import { executeLocalJob, recordInterruptedJob, confirmLocalDispatches } from "../src/local/report-worker.ts";
+import { executeLocalJob, maintainLocalQueue, confirmLocalDispatches } from "../src/local/report-worker.ts";
+import { accountProviderEnabled, initializeWorkerProviderVault, LocalProviderStore, providerDatabasePath } from "../app/lib/local-provider-store.ts";
+import { executeAccountProviderJob } from "../src/local/account-provider-job.ts";
 
 if (!localExecutionEnabled()) throw new Error("Local worker requires explicit self-hosted/local mode.");
-if (!process.env.OPENAI_API_KEY?.trim()) throw new Error("Set your own OPENAI_API_KEY before starting the research worker.");
+const accountKeys = accountProviderEnabled();
+if (accountKeys && process.env.OPENAI_API_KEY?.trim()) throw new Error("Account provider mode cannot use an installation-wide OPENAI_API_KEY. Remove it from the worker configuration.");
+let privateProviderKey = "";
+if (accountKeys) {
+  const store = new LocalProviderStore(providerDatabasePath());
+  try { privateProviderKey = initializeWorkerProviderVault(store, process.env.MARKET_SIGNAL_PROVIDER_PRIVATE_DIR || "/provider-private"); }
+  finally { store.close(); }
+}
+const researchEnabled = accountKeys || Boolean(process.env.OPENAI_API_KEY?.trim());
 const queue = new LocalReportQueue(localQueuePath());
-queue.noteWorkerReady();
-const presence = setInterval(() => queue.noteWorkerReady(), 10_000);
+queue.noteWorkerReady(Date.now(), researchEnabled);
+const presence = setInterval(() => queue.noteWorkerReady(Date.now(), researchEnabled), 10_000);
 let stopping = false;
 function stop() { stopping = true; clearInterval(presence); queue.noteWorkerReady(0); }
 process.on("SIGTERM", stop);
 process.on("SIGINT", stop);
-console.info("10Signals local worker ready; concurrency 1; automatic paid retries disabled.");
+console.info(researchEnabled ? "10Signals local worker ready; concurrency 1; automatic paid retries disabled." : "10Signals is installed. Research is disabled: configure your provider key with setup --set-key, then restart the worker.");
 try {
   while (!stopping) {
     try {
-    queue.interruptExpired();
-    queue.expireUnconfirmed();
-    for (const job of queue.unnotifiedTerminal()) {
-      try { await recordInterruptedJob(job); queue.markNotified(job.id); }
-      catch { queue.deferNotification(job.id); console.error(JSON.stringify({runId:job.id,errorCode:"terminal-notification-pending"})); }
-    }
+    await maintainLocalQueue(queue, researchEnabled);
+    if (!researchEnabled) { await delay(1000); continue; }
     try { await confirmLocalDispatches(queue); }
     catch { console.error(JSON.stringify({errorCode:"dispatch-confirmation-pending"})); await delay(1000); continue; }
     const job = queue.claim();
     if (!job) { await delay(1000); continue; }
     console.info(JSON.stringify({ runId: job.id, status: "running" }));
-    try { await executeLocalJob(queue, job); console.info(JSON.stringify({ runId: job.id, status: "terminal" })); }
+    try { if (accountKeys) await executeAccountProviderJob(queue, job, privateProviderKey); else await executeLocalJob(queue, job); console.info(JSON.stringify({ runId: job.id, status: "terminal" })); }
     catch { console.error(JSON.stringify({ runId: job.id, status: "failed", errorCode: "local-report-failed" })); }
     } catch { console.error(JSON.stringify({errorCode:"local-queue-unavailable"})); await delay(5000); }
   }

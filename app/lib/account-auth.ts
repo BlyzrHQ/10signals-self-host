@@ -6,6 +6,7 @@ import { ensureMcpOAuthSchema } from "./mcp-oauth-schema.ts";
 import { ensureFirstPartyCliClient } from "./cli-oauth.ts";
 import { canonicalNodeSqlitePath } from "./node-sqlite-database.ts";
 import { selfHostedEnabled } from "./self-host-config.ts";
+import { localHttpOrigin, localHttpRequestAllowed } from "./local-http.ts";
 
 const MINIMUM_SECRET_LENGTH = 32;
 const BUSY_TIMEOUT_MS = 10_000;
@@ -16,6 +17,7 @@ export type AccountAuthConfig = {
   mcpEnabled?: boolean;
   secret: string;
   allowSignUp?: boolean;
+  localHttp?: boolean;
 };
 
 type AccountUser = {
@@ -54,7 +56,7 @@ export function accountAuthConfigFromEnvironment(
     return null;
   }
   if (
-    parsedURL.protocol !== "https:" ||
+    (parsedURL.protocol !== "https:" && localHttpOrigin(environment) !== parsedURL.origin) ||
     parsedURL.pathname !== "/" ||
     parsedURL.search ||
     parsedURL.hash ||
@@ -68,10 +70,12 @@ export function accountAuthConfigFromEnvironment(
     mcpEnabled: hostedMcpEnabled(environment, parsedURL.origin),
     ...(selfHostedEnabled(environment) ? { allowSignUp: environment.MARKET_SIGNAL_SELF_HOST_ALLOW_SIGNUP === "true" } : {}),
     secret,
+    ...(localHttpOrigin(environment) ? { localHttp: true } : {}),
   };
 }
 
 export async function accountAuthHandler(request: Request): Promise<Response> {
+  if (!localHttpRequestAllowed(request)) return Response.json({ error: "Invalid local request origin." }, { status: 403 });
   const config = accountAuthConfigFromEnvironment(process.env);
   if (!config) {
     return Response.json(
@@ -120,6 +124,7 @@ export async function createAccountAuth(config: AccountAuthConfig) {
     baseURL: config.baseURL,
     database,
     secret: config.secret,
+    ...(config.localHttp ? { advanced: { useSecureCookies: false, cookiePrefix: `signals-local-${createHash("sha256").update(config.baseURL).digest("hex").slice(0, 12)}` } } : {}),
     emailAndPassword: { enabled: true, disableSignUp: config.allowSignUp === false },
     plugins,
     databaseHooks: {
@@ -388,6 +393,7 @@ export async function configuredAccountAuth() {
 }
 
 export async function accountContext(request: Request): Promise<AccountContext | null> {
+  if (!localHttpRequestAllowed(request)) return null;
   const config = accountAuthConfigFromEnvironment(process.env);
   if (!config) return null;
   const auth = await getAccountAuth(config);

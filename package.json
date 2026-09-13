@@ -12,7 +12,7 @@
     "build:vps": "cross-env MARKET_SIGNAL_DEPLOY_TARGET=node npm run build && node scripts/assert-vps-build.mjs",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "test": "node --test tests/local-report-queue.test.mjs"
+    "test": "node --test tests/local-report-queue.test.mjs tests/local-provider-settings.test.mjs"
   },
   "dependencies": {
     "@better-auth/cimd": "1.7.2",
@@ -40,6 +40,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
     "@tailwindcss/postcss": "4.2.1",
     "@trigger.dev/build": "4.5.4",
     "@types/better-sqlite3": "7.6.13",

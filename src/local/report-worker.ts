@@ -48,10 +48,22 @@ export async function recordInterruptedJob(job: { id: string; payload: LocalJob[
   if (report.run.attemptCount !== job.payload.reportAttempt) return;
   await appendReportEvent(job.payload.publicId, { attemptNumber: job.payload.reportAttempt,
     idempotencyKey: `local-interrupted-${job.id}`, phase: "failed", status: "failed",
-    message: job.error_code === "dispatch-unconfirmed" ? "Dispatch could not be confirmed. No research was launched; ask your operator to inspect this run."
+    message: job.error_code === "provider-not-configured" ? "The provider key was removed before research started. Configure the local worker before requesting another report."
+      : job.error_code === "account-provider-unavailable" ? "Your account's AI provider key is missing or unavailable. Check Account → AI provider before requesting another report. No automatic paid retry was launched."
+      : job.error_code === "dispatch-unconfirmed" ? "Dispatch could not be confirmed. No research was launched; ask your operator to inspect this run."
       : job.status === "failed" ? "The local research task failed. No automatic paid retry was launched; ask your operator to inspect this run."
       : "The local worker stopped unexpectedly. No automatic paid retry was launched; ask your operator to inspect this run.",
     errorCode: job.status === "failed" ? "local-report-failed" : "local-worker-interrupted" });
+}
+
+export async function maintainLocalQueue(queue: LocalReportQueue, researchEnabled: boolean, notify = recordInterruptedJob) {
+  queue.interruptExpired();
+  queue.expireUnconfirmed();
+  if (!researchEnabled) queue.failQueuedWithoutProvider();
+  for (const job of queue.unnotifiedTerminal()) {
+    try { await notify(job); queue.markNotified(job.id); }
+    catch { queue.deferNotification(job.id); console.error(JSON.stringify({ runId: job.id, errorCode: "terminal-notification-pending" })); }
+  }
 }
 
 export async function confirmLocalDispatches(queue: LocalReportQueue, loadReport: typeof getStoredReport = getStoredReport) {

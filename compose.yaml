@@ -1,7 +1,7 @@
 # Local-only preview. Exported as compose.yaml in the public distribution.
 # Public amd64/arm64 candidate, pinned by digest. Owner acceptance is pending.
 x-app: &app
-  image: ghcr.io/blyzrhq/10signals-self-host@sha256:b836ee55c2e3c7e21f0d3e4a5bcd6909623db4e207f3588317f5b46ac0a15705
+  image: ghcr.io/blyzrhq/10signals-self-host@sha256:fbfd006552ce6de144c901bf73eebb6241a91873343d4f7c0fab4eb675e1c151
   init: true
   restart: unless-stopped
   read_only: true
@@ -13,15 +13,18 @@ x-runtime: &runtime
   MARKET_SIGNAL_MODE: self-hosted
   MARKET_SIGNAL_DEPLOY_TARGET: node
   MARKET_SIGNAL_EXECUTION_BACKEND: local
+  MARKET_SIGNAL_ACCOUNT_PROVIDER: "true"
   MARKET_SIGNAL_HOSTED_BILLING: "false"
   MARKET_SIGNAL_SQLITE_PATH: /data/10signals.sqlite
 services:
   setup:
-    image: ghcr.io/blyzrhq/10signals-self-host@sha256:b836ee55c2e3c7e21f0d3e4a5bcd6909623db4e207f3588317f5b46ac0a15705
+    image: ghcr.io/blyzrhq/10signals-self-host@sha256:fbfd006552ce6de144c901bf73eebb6241a91873343d4f7c0fab4eb675e1c151
     profiles: [setup]
     user: "0:0"
     working_dir: /setup
     entrypoint: [node, /app/scripts/setup-local.mjs]
+    environment:
+      MARKET_SIGNAL_ACCOUNT_PROVIDER: "true"
     network_mode: none
     read_only: true
     security_opt: [no-new-privileges:true]
@@ -40,12 +43,13 @@ services:
       MARKET_SIGNAL_SELF_HOST_ALLOW_SIGNUP: "true"
   worker:
     <<: *app
+    volumes: [application-data:/data, provider-private:/provider-private]
     command: [node, --experimental-strip-types, scripts/local-worker.ts]
     stop_grace_period: 10m
     environment:
       <<: *runtime
       MARKET_SIGNAL_PROCESS_ROLE: worker
-      OPENAI_API_KEY: ${TEN_SIGNALS_PROVIDER_KEY:-}
+      MARKET_SIGNAL_PROVIDER_PRIVATE_DIR: /provider-private
     depends_on:
       web:
         condition: service_healthy
@@ -79,3 +83,4 @@ services:
       retries: 5
 volumes:
   application-data:
+  provider-private:

@@ -58,22 +58,25 @@ async function hiddenKey() {
 
 async function main() {
   const args = process.argv.slice(2);
+  const accountKeys = process.env.MARKET_SIGNAL_ACCOUNT_PROVIDER === "true";
   if (args.includes("--help")) {
+    if (accountKeys) { console.log("docker compose run --rm setup [--port 8787]\nCreates private installation configuration. Add your OpenAI key in Account → AI provider after starting 10Signals."); return; }
     console.log("docker compose run --rm setup [--port 8787] [--without-provider | --key-stdin] [--set-key]\nCreates private .env. --set-key changes only the provider key in an existing installer-generated .env. Existing accounts and reports are preserved."); return;
   }
   if (args.some((a, i) => !["--port", "--without-provider", "--key-stdin", "--set-key"].includes(a) && args[i - 1] !== "--port") || (args.includes("--without-provider") && args.includes("--key-stdin")) || (args.includes("--set-key") && args.includes("--port"))) throw Error("Invalid arguments. Use --help.");
   const port = args.includes("--port") ? Number(args[args.indexOf("--port") + 1]) : 8787;
+  if (accountKeys && (args.includes("--key-stdin") || args.includes("--set-key"))) throw Error("Add or replace your OpenAI key in Account → AI provider. No configuration was changed.");
   let providerKey = "";
   if (args.includes("--key-stdin")) {
     if (process.stdin.isTTY) throw Error("--key-stdin requires piped input, not a terminal.");
     for await (const chunk of process.stdin) { providerKey += chunk; if (providerKey.length > 4096) throw Error("Provider input is too long."); }
     providerKey = providerKey.trim();
-  } else if (!args.includes("--without-provider")) providerKey = await hiddenKey();
+  } else if (!accountKeys && !args.includes("--without-provider")) providerKey = await hiddenKey();
   const result = await saveLocalEnvironment(process.cwd(), { providerKey, port }, args.includes("--set-key"));
   console.log("Private configuration saved. No credentials printed.");
   console.log("Next: docker compose up -d --wait");
   console.log(`Open http://localhost:${result.port} and create a local account.`);
-  console.log(result.researchEnabled ? "The local research worker starts automatically. Provider usage is billed by your provider." : "Research is disabled until you run docker compose run --rm setup --set-key and then docker compose up -d --wait.");
+  console.log(accountKeys ? "Next, open Account → AI provider to test and save your own OpenAI key. No worker restart is needed." : result.researchEnabled ? "The local research worker starts automatically. Provider usage is billed by your provider." : "Research is disabled until you run docker compose run --rm setup --set-key and then docker compose up -d --wait.");
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main().catch(error => {

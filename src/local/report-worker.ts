@@ -49,6 +49,7 @@ export async function recordInterruptedJob(job: { id: string; payload: LocalJob[
   await appendReportEvent(job.payload.publicId, { attemptNumber: job.payload.reportAttempt,
     idempotencyKey: `local-interrupted-${job.id}`, phase: "failed", status: "failed",
     message: job.error_code === "provider-not-configured" ? "The provider key was removed before research started. Configure the local worker before requesting another report."
+      : job.error_code === "account-provider-unavailable" ? "Your account's AI provider key is missing or unavailable. Check Account → AI provider before requesting another report. No automatic paid retry was launched."
       : job.error_code === "dispatch-unconfirmed" ? "Dispatch could not be confirmed. No research was launched; ask your operator to inspect this run."
       : job.status === "failed" ? "The local research task failed. No automatic paid retry was launched; ask your operator to inspect this run."
       : "The local worker stopped unexpectedly. No automatic paid retry was launched; ask your operator to inspect this run.",

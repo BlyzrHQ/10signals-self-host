@@ -59,7 +59,7 @@ export type ReportCommandInput = {
 };
 
 export type ReportCommandDependencies = {
-  preflight?: () => string | null | Promise<string | null>;
+  preflight?: (actor?: ReportCommandActor) => string | null | Promise<string | null>;
   create: unknown;
   dispatch: typeof dispatchReportJob;
   markDispatched: typeof markReportDispatched;
@@ -186,8 +186,9 @@ async function consumeReportCreation(
 
 export function reportCommandDependencies(environment: Record<string, string | undefined> = process.env): ReportCommandDependencies {
   const dependencies: ReportCommandDependencies = {
-    ...(localExecutionEnabled(environment) && environment.MARKET_SIGNAL_LOCAL_HTTP === "true" ? { preflight: async () => {
-      const { localResearchSetupMessage, localResearchStatus } = await import("./local-report-dispatch.ts");
+    ...(localExecutionEnabled(environment) && (environment.MARKET_SIGNAL_LOCAL_HTTP === "true" || environment.MARKET_SIGNAL_ACCOUNT_PROVIDER === "true") ? { preflight: async (actor?: ReportCommandActor) => {
+      const { localResearchSetupMessage, localResearchStatus, accountResearchSetupMessage } = await import("./local-report-dispatch.ts");
+      if (environment.MARKET_SIGNAL_ACCOUNT_PROVIDER === "true") return accountResearchSetupMessage(actor, environment);
       return localResearchSetupMessage(localResearchStatus(environment));
     } } : {}),
     create: async (input: { primaryDomain: string; locale?: "en" | "ar"; entitlement?: { plan: ProductPlan; productLimit: number }; workspaceId?: string; billingReservationId?: string; commandId?: string; researchOptions?: ReportResearchOptions }) => createReportRunResult({
@@ -225,7 +226,7 @@ export async function createReportCommand(input: ReportCommandInput, services: R
   let reservationId = "";
   let publicId = "";
   try {
-    const setupMessage = await services.preflight?.();
+    const setupMessage = await services.preflight?.(input.actor);
     if (setupMessage) return { ok: false, status: 503, error: setupMessage, errorCode: "research-setup-required", stage: "request" };
     const researchOptions = parseReportResearchOptions({ engine: "direct-trigger", includeAnalysis: input.includeAnalysis ?? false,
       ...(input.closePricePercent !== undefined ? { closePricePercent: input.closePricePercent } : {}) });

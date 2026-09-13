@@ -12,7 +12,7 @@
     "build:vps": "cross-env MARKET_SIGNAL_DEPLOY_TARGET=node npm run build && node scripts/assert-vps-build.mjs",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "test": "node --test tests/local-report-queue.test.mjs"
+    "test": "node --test tests/local-report-queue.test.mjs tests/local-provider-settings.test.mjs"
   },
   "dependencies": {
     "@better-auth/cimd": "1.7.2",

@@ -3,9 +3,19 @@ import { localExecutionEnabled } from "../app/lib/self-host-config.ts";
 import { localQueuePath } from "../app/lib/local-report-dispatch.ts";
 import { LocalReportQueue } from "../src/local/report-queue.ts";
 import { executeLocalJob, maintainLocalQueue, confirmLocalDispatches } from "../src/local/report-worker.ts";
+import { accountProviderEnabled, initializeWorkerProviderVault, LocalProviderStore, providerDatabasePath } from "../app/lib/local-provider-store.ts";
+import { executeAccountProviderJob } from "../src/local/account-provider-job.ts";
 
 if (!localExecutionEnabled()) throw new Error("Local worker requires explicit self-hosted/local mode.");
-const researchEnabled = Boolean(process.env.OPENAI_API_KEY?.trim());
+const accountKeys = accountProviderEnabled();
+if (accountKeys && process.env.OPENAI_API_KEY?.trim()) throw new Error("Account provider mode cannot use an installation-wide OPENAI_API_KEY. Remove it from the worker configuration.");
+let privateProviderKey = "";
+if (accountKeys) {
+  const store = new LocalProviderStore(providerDatabasePath());
+  try { privateProviderKey = initializeWorkerProviderVault(store, process.env.MARKET_SIGNAL_PROVIDER_PRIVATE_DIR || "/provider-private"); }
+  finally { store.close(); }
+}
+const researchEnabled = accountKeys || Boolean(process.env.OPENAI_API_KEY?.trim());
 const queue = new LocalReportQueue(localQueuePath());
 queue.noteWorkerReady(Date.now(), researchEnabled);
 const presence = setInterval(() => queue.noteWorkerReady(Date.now(), researchEnabled), 10_000);
@@ -24,7 +34,7 @@ try {
     const job = queue.claim();
     if (!job) { await delay(1000); continue; }
     console.info(JSON.stringify({ runId: job.id, status: "running" }));
-    try { await executeLocalJob(queue, job); console.info(JSON.stringify({ runId: job.id, status: "terminal" })); }
+    try { if (accountKeys) await executeAccountProviderJob(queue, job, privateProviderKey); else await executeLocalJob(queue, job); console.info(JSON.stringify({ runId: job.id, status: "terminal" })); }
     catch { console.error(JSON.stringify({ runId: job.id, status: "failed", errorCode: "local-report-failed" })); }
     } catch { console.error(JSON.stringify({errorCode:"local-queue-unavailable"})); await delay(5000); }
   }

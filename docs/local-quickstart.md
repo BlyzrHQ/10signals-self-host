@@ -20,7 +20,7 @@ research automatically. The separately installed Trigger CLI is a different path
 Use a new folder, leaving existing installations untouched.
 
 ```text
-git clone --branch codex/local-quickstart https://github.com/BlyzrHQ/10signals-self-host.git 10signals
+git clone --branch codex/provider-settings https://github.com/BlyzrHQ/10signals-self-host.git 10signals
 ```
 
 ```text
@@ -31,11 +31,9 @@ cd 10signals
 docker compose run --rm setup
 ```
 
-Paste your own provider key at the hidden prompt. This creates private `.env`
-configuration with a fresh account secret. Existing configuration is not replaced.
-Press Enter to explore 10Signals without research; the app will show a setup notice.
-The key is saved locally, not sent to BlyzrHQ. Setup does not verify provider credit
-or model access; those are checked when you start research.
+Setup creates private `.env` configuration with a fresh account secret. Existing
+configuration is not replaced. No provider key is requested in the terminal.
+You can explore without research and add your own key in the app when ready.
 
 ```text
 docker compose up -d --wait
@@ -44,7 +42,24 @@ docker compose up -d --wait
 Docker downloads the prebuilt image. It does not compile the project on your
 computer. When web, worker and gateway are healthy, open
 [http://localhost:8787](http://localhost:8787), create your **local** account, and
-enter your domain. No company login or Trigger key is used.
+open **Account → AI provider**. Enter your OpenAI API key and choose **Test & save**.
+Then return home and enter your domain. No company login or Trigger key is used.
+
+The check verifies authentication and access to `gpt-5.6-luna`, `gpt-5.4-mini`, and
+`text-embedding-3-small` through OpenAI's model metadata endpoints. It does not
+generate a report or verify billing credit, write permissions, or inference.
+The key needs Models read access plus Responses and Embeddings access for reports.
+If your OpenAI project cannot access these models, the check explains which one
+is unavailable; it does not silently select another model.
+
+Keys are encrypted per personal account. Another local account cannot use yours.
+Test & save can replace an existing key; a failed check leaves the old key intact.
+Remove key clears it from this installation, not from OpenAI. Changes apply to
+queued and new reports, with no restart. A running report may finish with the key
+it already loaded. Never paste a key into chat, an issue, a screenshot or a command.
+The worker processes one report at a time. Its emergency execution ceiling matches
+the shared Trigger task (14,700 seconds); this is not an expected report duration.
+Worker interruption or reaching that ceiling stops the job without a paid retry.
 
 Only use the `localhost` address. `127.0.0.1` as a browser address and other Host
 headers are rejected intentionally. The gateway binds only to `127.0.0.1`; never
@@ -58,7 +73,7 @@ computer, not a shared or multi-user server.
 
 | Want to… | Command |
 | --- | --- |
-| Change/add your provider key | `docker compose run --rm setup --set-key` |
+| Change/add/remove your provider key | Account → AI provider in the app |
 | Apply configuration changes | `docker compose up -d --wait` |
 | Check services | `docker compose ps` |
 | View worker errors | `docker compose logs --tail 100 worker` |
@@ -67,19 +82,25 @@ computer, not a shared or multi-user server.
 
 For a different port on first setup: `docker compose run --rm setup --port 8788`.
 For installation-only automation: `docker compose run --rm -T setup --without-provider`.
-For secure unattended provisioning, `--key-stdin` accepts the key from your secret
-manager through stdin. Do not put it in a command argument or share `.env`.
+The account-provider preview does not accept `--key-stdin` or `--set-key`; keys
+are configured per signed-in account in the app. Do not share `.env`.
 Avoid `docker compose config` in screenshots: its full output includes secrets.
 
 Accounts, reports and queue state live in the installation's `application-data`
-Docker volume. Stop containers before backing up that entire volume and `.env`;
-restore them together. `docker compose down --volumes` deletes the data: do not use
-it for updates. Setup's `--set-key` preserves the account secret and port.
+Docker volume. The worker's decryption key lives in a separate `provider-private`
+volume, not mounted in the web container. Stop containers before backing up both
+volumes and `.env`; restore them together. These backups are key-equivalent and
+must be protected as credentials. If the private volume is missing or mismatched,
+the worker refuses startup. Restore its matching backup; never delete/reinitialize
+it to fix an error. `docker compose down --volumes` deletes data: do not use it for
+updates. Saved keys are not automatically revoked at OpenAI when backups are removed.
 
 On Linux the generated file has mode 0600 and the installation directory's owner.
 On Windows/macOS keep the folder private to your OS user; filesystem protections
-depend on Docker Desktop's host file sharing. No provider key enters the web
-container and no account-auth secret enters the worker.
+depend on Docker Desktop's host file sharing. The web service receives your key
+only during a test/save request and seals it for the worker. It cannot retrieve
+saved plaintext keys. No account-auth secret enters the worker. A machine/container
+administrator can still access process memory and backups: trust your host.
 
 ## Updates and existing installations
 
@@ -93,3 +114,8 @@ The older HTTPS/source-build preview uses `.env.self-host`, a separate Compose
 file and separate volumes. Continue using [its guide](self-hosting.md) for that
 installation. This quickstart does not migrate or overwrite it. Public-server
 hardening, local API/MCP and scheduled watches remain separate acceptance gates.
+
+Earlier quickstarts stored an installation-wide key in `.env`. This candidate
+does not use that key. Re-enter your own key in Account → AI provider; no automatic
+credential migration is performed. Do not add `OPENAI_API_KEY` to the worker in
+account-provider mode: mixed credential modes are rejected at startup.

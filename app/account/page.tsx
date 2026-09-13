@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SiteHeader } from "../components/site-header";
+import { AccountProviderSettings } from "../components/account-provider-settings";
 import { FormEvent, useEffect, useState } from "react";
 import { accountAuthClient } from "../lib/account-auth-client.ts";
 import { newestAccountReportPath, safeAccountReturnPath } from "../lib/account-report-redirect.ts";
@@ -14,7 +15,7 @@ const PLANS = [
 ];
 
 type Locale = "en" | "ar";
-type Section = "reports" | "plan" | "profile" | "keys" | "apps";
+type Section = "reports" | "plan" | "profile" | "keys" | "apps" | "provider";
 
 /* Copy from the supplied 10 Signals design (en + ar). Strings that described planned-only
    behaviour in the prototype are replaced by the real product behaviour. */
@@ -80,6 +81,7 @@ const COPY = {
 type Status = {
   authenticated: boolean;
   mode?: "self-hosted";
+  accountProvider?: boolean;
   user?: { name: string; email: string };
   subscription?: { plan: { id: string; name: string; reportsPerMonth: number; productLimit: number; monitoringCredits: number } | null; status: string; cancelAtPeriodEnd: boolean; currentPeriodEnd: string } | null;
   usage?: { used: number; limit: number };
@@ -187,6 +189,7 @@ export default function AccountPage() {
       const next = response.ok ? await response.json() as Status : { authenticated: false };
       if (!active) return;
       setStatus(next);
+      if (next.mode === "self-hosted" && next.accountProvider && requestedSection === "provider") setSection("provider");
       if (next.mode !== "self-hosted" && (requestedSection === "keys" || requestedSection === "apps")) setSection(requestedSection);
       if (next.authenticated) {
         const apps = await fetch("/api/account/connected-apps", { cache: "no-store" });
@@ -229,6 +232,7 @@ export default function AccountPage() {
         return;
       }
       const requestedPath = safeAccountReturnPath(new URLSearchParams(window.location.search).get("next"));
+      if (new URLSearchParams(window.location.search).get("section") === "provider") { window.location.assign("/account?section=provider"); return; }
       if (requestedPath) {
         window.location.assign(requestedPath);
         return;
@@ -379,6 +383,7 @@ export default function AccountPage() {
   const NAV: Array<[Section, string]> = status.mode === "self-hosted"
     ? [["reports", t.myReports], ["plan", ar ? "التثبيت المحلي" : "Your installation"], ["profile", t.profile]]
     : [["reports", t.myReports], ["plan", t.planUsage], ["profile", t.profile], ["keys", t.apiKeys], ["apps", t.connectedApps]];
+  if (status.mode === "self-hosted" && status.accountProvider) NAV.splice(1, 0, ["provider", ar ? "مزود الذكاء الاصطناعي" : "AI provider"]);
 
   return <main className="ds-page acct-page account-page-ds" lang={locale} dir={dir}>
     <div className="ds-frame">
@@ -400,6 +405,7 @@ export default function AccountPage() {
           {NAV.map(([key, label]) => <button key={key} type="button" aria-current={section === key ? "true" : undefined} onClick={() => setSection(key)}>{label}</button>)}
         </nav>
         <div className="acct-sections">
+          {section === "provider" && status.mode === "self-hosted" && status.accountProvider && <AccountProviderSettings ar={ar} />}
           {error && <p className="ds-alert acct-alert" role="alert"><span aria-hidden="true">⚠</span><span>{error}</span></p>}
 
           {section === "reports" && <section className="acct-section" aria-labelledby="acct-reports-title">

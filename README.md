@@ -15,7 +15,7 @@ npm, Go, GitHub login or certificate installation is needed. Windows PowerShell,
 macOS Terminal and Linux use the same four commands.
 
 ```text
-git clone --branch codex/local-quickstart https://github.com/BlyzrHQ/10signals-self-host.git 10signals
+git clone --branch codex/provider-settings https://github.com/BlyzrHQ/10signals-self-host.git 10signals
 ```
 
 ```text
@@ -26,10 +26,9 @@ cd 10signals
 docker compose run --rm setup
 ```
 
-Enter your own provider key at the hidden prompt. Never paste it into an issue or
-commit the generated `.env`. Press Enter to explore without research. Docker
-downloads a prebuilt image; nothing is compiled on your computer. Setup does not
-start research or verify provider credit/model access.
+Setup creates private configuration automatically. No key is requested in the
+terminal. Never commit the generated `.env`. Docker downloads a prebuilt image;
+nothing is compiled on your computer. Setup does not start research.
 
 ```text
 docker compose up -d --wait
@@ -37,9 +36,12 @@ docker compose up -d --wait
 
 The app, local worker and gateway start together. Open
 [http://localhost:8787](http://localhost:8787) and create a local account.
-Missing a provider key? The app shows a setup notice instead of creating a failed
-report. Add/change it with `docker compose run --rm setup --set-key`, then run
-`docker compose up -d --wait`. See the [quickstart guide](docs/local-quickstart.md)
+Open **Account → AI provider**, enter your own OpenAI API key, and select
+**Test & save**. Then create a report. There is no worker restart or Trigger key.
+Each account has its own encrypted key. The test checks authentication and model
+visibility, not billing credit or successful inference. Missing or rejected keys
+do not start a report. Replace or remove your key from the same screen.
+See the [quickstart guide](docs/local-quickstart.md)
 for ports, updates, backups and troubleshooting. Existing HTTPS/source-build
 installations should keep using [their guide](docs/self-hosting.md).
 
@@ -53,6 +55,7 @@ hardening and dependency remediation remain release gates.
 
 - 10Signals application and account-owned report storage.
 - Local background report worker and shared comparison engine.
+- Account-specific OpenAI key settings: test, encrypted save, replace and remove.
 - Container configuration, setup guide and local queue tests.
 - Public source evidence and visible report limitations; demo assets are UI examples.
 
@@ -72,6 +75,10 @@ before integrating into the source project and publishing a new snapshot. Public
 contributions never execute on our production infrastructure.
 
 Back up your data and private configuration before updating. Stop your local
+containers and back up both `application-data` and `provider-private` volumes
+together with `.env`. Together these backups can decrypt saved provider keys;
+protect them as credentials. Losing the private-key volume makes saved keys
+unusable; restore the matching backup rather than generating a new key. Stop your
 containers, run `git pull --ff-only`, review the release notes, pull the newly
 pinned image with `docker compose pull`, run `docker compose up -d --wait`, and verify
 your accounts and reports. Do not run `docker compose down --volumes` unless you

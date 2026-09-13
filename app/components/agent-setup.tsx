@@ -10,7 +10,7 @@ const AGENTS = [
   { name: "OpenClaw", icon: "openclaw" },
   { name: "Hermes", icon: "hermes" },
 ];
-const INSTALL_URL = "https://github.com/BlyzrHQ/market-signal/blob/codex/market-signal-cli/docs/direct-trigger-cli.md";
+const INSTALL_URL = "https://github.com/10claws/market-signal/blob/codex/market-signal-cli/docs/direct-trigger-cli.md";
 
 export function AgentSetup({ ar }: { ar: boolean }) {
   const [open, setOpen] = useState(false);

@@ -23,7 +23,7 @@ research automatically. The separately installed Trigger CLI is a different path
 Use a new folder, leaving existing installations untouched.
 
 ```text
-git clone https://github.com/BlyzrHQ/10signals-self-host.git 10signals
+git clone https://github.com/10claws/10signals-self-host.git 10signals
 ```
 
 ```text

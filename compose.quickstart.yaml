@@ -1,7 +1,7 @@
 # Local-only preview. Exported as compose.yaml in the public distribution.
 # Public amd64/arm64 candidate, pinned by digest. Owner acceptance is pending.
 x-app: &app
-  image: ghcr.io/blyzrhq/10signals-self-host@sha256:fbfd006552ce6de144c901bf73eebb6241a91873343d4f7c0fab4eb675e1c151
+  image: ghcr.io/blyzrhq/10signals-self-host@sha256:f3b4de48b8ebc3bbe548724437ef57d7011da20346cfd262f980c03c29fbfb39
   init: true
   restart: unless-stopped
   read_only: true
@@ -18,7 +18,7 @@ x-runtime: &runtime
   MARKET_SIGNAL_SQLITE_PATH: /data/10signals.sqlite
 services:
   setup:
-    image: ghcr.io/blyzrhq/10signals-self-host@sha256:fbfd006552ce6de144c901bf73eebb6241a91873343d4f7c0fab4eb675e1c151
+    image: ghcr.io/blyzrhq/10signals-self-host@sha256:f3b4de48b8ebc3bbe548724437ef57d7011da20346cfd262f980c03c29fbfb39
     profiles: [setup]
     user: "0:0"
     working_dir: /setup
@@ -38,6 +38,7 @@ services:
       <<: *runtime
       MARKET_SIGNAL_PROCESS_ROLE: app
       MARKET_SIGNAL_LOCAL_HTTP: "true"
+      MARKET_SIGNAL_LOCAL_MCP: "true"
       BETTER_AUTH_URL: http://localhost:${TEN_SIGNALS_PORT:-8787}
       BETTER_AUTH_SECRET: ${TEN_SIGNALS_AUTH_SECRET:-}
       MARKET_SIGNAL_SELF_HOST_ALLOW_SIGNUP: "true"

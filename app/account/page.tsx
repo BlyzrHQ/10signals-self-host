@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SiteHeader } from "../components/site-header";
 import { AccountProviderSettings } from "../components/account-provider-settings";
+import { AccountLocalMcp } from "../components/account-local-mcp";
 import { FormEvent, useEffect, useState } from "react";
 import { accountAuthClient } from "../lib/account-auth-client.ts";
 import { newestAccountReportPath, safeAccountReturnPath } from "../lib/account-report-redirect.ts";
@@ -15,7 +16,7 @@ const PLANS = [
 ];
 
 type Locale = "en" | "ar";
-type Section = "reports" | "plan" | "profile" | "keys" | "apps" | "provider";
+type Section = "reports" | "plan" | "profile" | "keys" | "apps" | "provider" | "local-mcp";
 
 /* Copy from the supplied 10 Signals design (en + ar). Strings that described planned-only
    behaviour in the prototype are replaced by the real product behaviour. */
@@ -82,6 +83,7 @@ type Status = {
   authenticated: boolean;
   mode?: "self-hosted";
   accountProvider?: boolean;
+  localMcp?: boolean;
   user?: { name: string; email: string };
   subscription?: { plan: { id: string; name: string; reportsPerMonth: number; productLimit: number; monitoringCredits: number } | null; status: string; cancelAtPeriodEnd: boolean; currentPeriodEnd: string } | null;
   usage?: { used: number; limit: number };
@@ -190,6 +192,7 @@ export default function AccountPage() {
       if (!active) return;
       setStatus(next);
       if (next.mode === "self-hosted" && next.accountProvider && requestedSection === "provider") setSection("provider");
+      if (next.mode === "self-hosted" && next.localMcp && requestedSection === "local-mcp") setSection("local-mcp");
       if (next.mode !== "self-hosted" && (requestedSection === "keys" || requestedSection === "apps")) setSection(requestedSection);
       if (next.authenticated) {
         const apps = await fetch("/api/account/connected-apps", { cache: "no-store" });
@@ -384,6 +387,7 @@ export default function AccountPage() {
     ? [["reports", t.myReports], ["plan", ar ? "التثبيت المحلي" : "Your installation"], ["profile", t.profile]]
     : [["reports", t.myReports], ["plan", t.planUsage], ["profile", t.profile], ["keys", t.apiKeys], ["apps", t.connectedApps]];
   if (status.mode === "self-hosted" && status.accountProvider) NAV.splice(1, 0, ["provider", ar ? "مزود الذكاء الاصطناعي" : "AI provider"]);
+  if (status.mode === "self-hosted" && status.localMcp) NAV.splice(2, 0, ["local-mcp", ar ? "اتصالات MCP" : "MCP connections"]);
 
   return <main className="ds-page acct-page account-page-ds" lang={locale} dir={dir}>
     <div className="ds-frame">
@@ -406,6 +410,7 @@ export default function AccountPage() {
         </nav>
         <div className="acct-sections">
           {section === "provider" && status.mode === "self-hosted" && status.accountProvider && <AccountProviderSettings ar={ar} />}
+          {section === "local-mcp" && status.mode === "self-hosted" && status.localMcp && <AccountLocalMcp ar={ar} />}
           {error && <p className="ds-alert acct-alert" role="alert"><span aria-hidden="true">⚠</span><span>{error}</span></p>}
 
           {section === "reports" && <section className="acct-section" aria-labelledby="acct-reports-title">
@@ -424,7 +429,7 @@ export default function AccountPage() {
             <p className="ds-note acct-section-note">{t.reportsNote}</p>
           </section>}
 
-          {section === "plan" && status.mode === "self-hosted" && <section className="acct-section"><h2 className="ds-h3">{ar ? "تثبيتك الخاص" : "Your own installation"}</h2><p>{ar ? "تعمل التقارير على بنيتك التحتية. أنت مسؤول عن تكاليف مزود البحث والخادم." : "Reports run on your infrastructure. You pay your own research provider and server costs; no hosted subscription is required."}</p><p>{ar ? "واجهة API وMCP ومراقبة الأسعار المجدولة غير مفعلة في هذه النسخة التجريبية." : "API, MCP and scheduled price watches are not enabled in this self-host candidate yet."}</p><Link href="/docs/self-host">{ar ? "دليل التثبيت" : "Installation guide"}</Link></section>}
+          {section === "plan" && status.mode === "self-hosted" && <section className="acct-section"><h2 className="ds-h3">{ar ? "تثبيتك الخاص" : "Your own installation"}</h2><p>{ar ? "تعمل التقارير على بنيتك التحتية. أنت مسؤول عن تكاليف مزود البحث والخادم." : "Reports run on your infrastructure. You pay your own research provider and server costs; no hosted subscription is required."}</p><p>{ar ? "يتوفر MCP المحلي في قسم الاتصالات عند تفعيله. واجهة API العامة ومراقبة الأسعار المجدولة غير مفعلة في هذه النسخة التجريبية." : "Local MCP is available under MCP connections when enabled. The general account API and scheduled price watches are not enabled in this preview."}</p><Link href="/docs/self-host">{ar ? "دليل التثبيت" : "Installation guide"}</Link></section>}
           {section === "plan" && status.mode !== "self-hosted" && <section className="acct-section" aria-labelledby="acct-plan-title">
             <div className="acct-head"><h2 className="ds-h3" id="acct-plan-title">{t.planUsage}</h2></div>
             <div className="acct-stats">

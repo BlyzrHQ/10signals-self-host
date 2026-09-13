@@ -4,13 +4,14 @@ import { getWorkspaceSubscription, openBillingDatabase, workspaceUsage } from ".
 import { priceWatchUsage } from "../../../lib/price-watch-store.ts";
 import { selfHostedEnabled } from "../../../lib/self-host-config.ts";
 import { accountProviderEnabled } from "../../../lib/local-provider-store.ts";
+import { localMcpOrigin } from "../../../lib/local-mcp-store.ts";
 
 export async function GET(request: Request) {
   const account = await accountContext(request);
   if (!account) return Response.json({ authenticated: false }, { status: 401, headers: { "cache-control": "no-store" } });
   if (selfHostedEnabled()) return Response.json({ authenticated: true, user: account.user,
-    mode: "self-hosted", accountProvider: accountProviderEnabled(), subscription: null, usage: null, monitoringUsage: null,
-    limitations: ["Provider and server charges belong to this installation.", "Self-hosted API, MCP and scheduled price watches are not enabled in this candidate."] },
+    mode: "self-hosted", accountProvider: accountProviderEnabled(), localMcp: Boolean(localMcpOrigin()), subscription: null, usage: null, monitoringUsage: null,
+    limitations: ["Provider and server charges belong to this installation.", "Self-hosted account API and scheduled price watches are not enabled in this candidate."] },
     { headers: { "cache-control": "no-store" } });
   const database = await openBillingDatabase();
   try {

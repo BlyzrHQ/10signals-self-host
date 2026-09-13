@@ -125,7 +125,7 @@ function jsonRecord(value: Record<string, unknown>): Record<string, unknown> {
   return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
 }
 
-function successfulToolResult(value: Record<string, unknown>): CallToolResult {
+export function successfulToolResult(value: Record<string, unknown>): CallToolResult {
   const structuredContent = jsonRecord(value);
   return {
     content: [{ type: "text", text: JSON.stringify(structuredContent) }],
@@ -142,7 +142,7 @@ function failedToolResult(code: string, message: string): CallToolResult {
   };
 }
 
-function outcomeToolResult(value: Record<string, unknown>): CallToolResult {
+export function outcomeToolResult(value: Record<string, unknown>): CallToolResult {
   const error = value.ok === false && value.error && typeof value.error === "object"
     ? value.error as Record<string, unknown>
     : null;
@@ -155,7 +155,7 @@ function outcomeToolResult(value: Record<string, unknown>): CallToolResult {
   };
 }
 
-function safeToolFailure(error: unknown, operation: string): CallToolResult {
+export function safeToolFailure(error: unknown, operation: string): CallToolResult {
   if (error instanceof ReportQueryError) {
     return failedToolResult("not-found", "Report not found.");
   }
@@ -237,8 +237,8 @@ function registerReportWriteTools(server: McpServer, principal: McpPrincipal, se
   );
 }
 
-function privateReportUrl(publicId: string) {
-  return `${MARKET_SIGNAL_ORIGIN}/reports/${publicId}`;
+function privateReportUrl(publicId: string, origin = MARKET_SIGNAL_ORIGIN) {
+  return `${origin}/reports/${publicId}`;
 }
 
 function customerWatcher(watcher: PriceWatcher) {
@@ -247,7 +247,7 @@ function customerWatcher(watcher: PriceWatcher) {
   return customerSafe;
 }
 
-function registerReportTools(server: McpServer, principal: McpPrincipal, services: McpReadServices) {
+export function registerReportTools(server: McpServer, principal: McpPrincipal, services: McpReadServices, origin = MARKET_SIGNAL_ORIGIN) {
   server.registerTool(
     "reports_list",
     {
@@ -264,7 +264,7 @@ function registerReportTools(server: McpServer, principal: McpPrincipal, service
         const page = await services.listReports(principal.workspaceId, { limit, cursor });
         return successfulToolResult({
           ok: true,
-          reports: page.items.map((report) => ({ ...report, privateUrl: privateReportUrl(report.publicId) })),
+          reports: page.items.map((report) => ({ ...report, privateUrl: privateReportUrl(report.publicId, origin) })),
           nextCursor: page.nextCursor,
         });
       } catch (error) {
@@ -288,7 +288,7 @@ function registerReportTools(server: McpServer, principal: McpPrincipal, service
         return successfulToolResult({
           ok: true,
           report,
-          privateUrl: privateReportUrl(publicReportId),
+          privateUrl: privateReportUrl(publicReportId, origin),
           pollAfterSeconds: terminal ? null : 10,
         });
       } catch (error) {

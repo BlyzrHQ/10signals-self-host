@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "tensignals-local": {
+      "type": "http",
+      "url": "${TEN_SIGNALS_MCP_URL:-http://localhost:8787/mcp}",
+      "headers": {
+        "Authorization": "Bearer ${TEN_SIGNALS_MCP_TOKEN}"
+      }
+    }
+  }
+}

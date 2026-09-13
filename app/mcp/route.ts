@@ -5,6 +5,8 @@ import { openMcpOAuthDatabase } from "../lib/mcp-oauth-store.ts";
 import { createTenSignalsMcpHandler } from "../lib/mcp-read-server.ts";
 import { McpAccessTokenError, verifyMcpAccessToken } from "../lib/mcp-token-verifier.ts";
 import { readBoundedJsonObject } from "../lib/request-json.ts";
+import { selfHostedEnabled } from "../lib/self-host-config.ts";
+import { localMcpRoute } from "../lib/local-mcp-route.ts";
 
 const MAX_MCP_REQUEST_BYTES = 256 * 1_024;
 const MCP_METADATA_URL = `${MARKET_SIGNAL_ORIGIN}/.well-known/oauth-protected-resource`;
@@ -161,12 +163,14 @@ export function nonPostTenSignalsMcp(services: Pick<McpRouteDependencies, "enabl
 }
 
 export async function POST(request: Request) {
+  if (selfHostedEnabled()) return localMcpRoute(request);
   return postTenSignalsMcp(request);
 }
 
-export async function GET() { return nonPostTenSignalsMcp(); }
-export async function HEAD() { return nonPostTenSignalsMcp(); }
-export async function OPTIONS() { return nonPostTenSignalsMcp(); }
-export async function PUT() { return nonPostTenSignalsMcp(); }
-export async function PATCH() { return nonPostTenSignalsMcp(); }
-export async function DELETE() { return nonPostTenSignalsMcp(); }
+const otherMethod = (request: Request) => selfHostedEnabled() ? localMcpRoute(request) : nonPostTenSignalsMcp();
+export const GET = otherMethod;
+export const HEAD = otherMethod;
+export const OPTIONS = otherMethod;
+export const PUT = otherMethod;
+export const PATCH = otherMethod;
+export const DELETE = otherMethod;

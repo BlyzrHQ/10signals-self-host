@@ -15,7 +15,7 @@ npm, Go, GitHub login or certificate installation is needed. Windows PowerShell,
 macOS Terminal and Linux use the same four commands.
 
 ```text
-git clone --branch codex/provider-settings https://github.com/BlyzrHQ/10signals-self-host.git 10signals
+git clone --branch codex/self-host-mcp https://github.com/BlyzrHQ/10signals-self-host.git 10signals
 ```
 
 ```text
@@ -47,8 +47,9 @@ installations should keep using [their guide](docs/self-hosting.md).
 
 This candidate binds only to your own computer. Do not expose it publicly by
 changing the port binding or opening a tunnel. Other users of a shared computer
-can reach localhost: use a trusted personal computer. Local API/MCP and scheduled price watches
-are not enabled yet. Live local research, successful sharing, public-server
+can reach localhost: use a trusted personal computer. Local MCP supports account-owned
+reports; the general account API and scheduled price watches are not enabled yet.
+Live local research, successful sharing, public-server
 hardening and dependency remediation remain release gates.
 
 ## What is included
@@ -56,6 +57,7 @@ hardening and dependency remediation remain release gates.
 - 10Signals application and account-owned report storage.
 - Local background report worker and shared comparison engine.
 - Account-specific OpenAI key settings: test, encrypted save, replace and remove.
+- Local MCP: scoped, expiring connections for Claude Code and Codex. See [connect an agent](docs/local-mcp.md).
 - Container configuration, setup guide and local queue tests.
 - Public source evidence and visible report limitations; demo assets are UI examples.
 

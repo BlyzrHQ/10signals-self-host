@@ -20,7 +20,7 @@ research automatically. The separately installed Trigger CLI is a different path
 Use a new folder, leaving existing installations untouched.
 
 ```text
-git clone --branch codex/provider-settings https://github.com/BlyzrHQ/10signals-self-host.git 10signals
+git clone --branch codex/self-host-mcp https://github.com/BlyzrHQ/10signals-self-host.git 10signals
 ```
 
 ```text
@@ -113,7 +113,14 @@ Intel/AMD64 or Apple Silicon/ARM64.
 The older HTTPS/source-build preview uses `.env.self-host`, a separate Compose
 file and separate volumes. Continue using [its guide](self-hosting.md) for that
 installation. This quickstart does not migrate or overwrite it. Public-server
-hardening, local API/MCP and scheduled watches remain separate acceptance gates.
+hardening, the general local account API and scheduled watches remain separate acceptance gates.
+
+## Connect your agent
+
+Open **Account → MCP connections** to create a scoped connection for an agent
+on this computer. Start read-only; the agent uses a separate token, never your
+OpenAI key or our company credentials. Follow the [local MCP guide](local-mcp.md)
+for Claude Code and Codex on Windows or macOS/Linux.
 
 Earlier quickstarts stored an installation-wide key in `.env`. This candidate
 does not use that key. Re-enter your own key in Account → AI provider; no automatic

@@ -2,7 +2,7 @@
   "format": 1,
   "project": "10Signals",
   "destination": "BlyzrHQ/10signals-self-host",
-  "sourceRevision": "435214513d21b879319b16c2181c7ee583863791",
+  "sourceRevision": "3e478308128effc4dfead0f84a47bfcee87731e3",
   "status": "self-hosting-preview",
   "files": {
     ".dockerignore": {
@@ -1402,7 +1402,7 @@
       "mode": "100644"
     },
     "README.md": {
-      "sha256": "d23d8cf31cc74883eda3865ef3b8aba35fcf778c4d21a2f71900b244503b772a",
+      "sha256": "c6368ea461cb9d31b29477ef1abca51a352239921449264f1f6afa784aab3f4d",
       "mode": "100644"
     },
     "scripts/assert-vps-build.mjs": {

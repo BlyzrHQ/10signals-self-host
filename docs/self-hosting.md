@@ -22,7 +22,7 @@ Run this in the parent folder where you want to install 10Signals. The destinati
 must be a new folder; Git will not replace an existing installation.
 
 ```text
-git clone https://github.com/BlyzrHQ/10signals-self-host.git 10signals
+git clone https://github.com/10claws/10signals-self-host.git 10signals
 ```
 
 ```text

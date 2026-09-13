@@ -1,9 +1,10 @@
 {
   "format": 1,
   "project": "10Signals",
-  "destination": "BlyzrHQ/10signals-self-host",
+  "destination": "10claws/10signals-self-host",
   "sourceRevision": "3e478308128effc4dfead0f84a47bfcee87731e3",
   "status": "self-hosting-preview",
+  "ownerMigration": { "from": "BlyzrHQ", "to": "10claws", "repositoryId": 1367252067, "basePublicCommit": "42b3a29cb3b4951bd2ccf58ea224a6f176b257f1" },
   "files": {
     ".dockerignore": {
       "sha256": "5b663cf36b70faf8dd96509b16723e2d35b933f11a88c3430b0ab2f7fdfbc4b8",
@@ -246,7 +247,7 @@
       "mode": "100644"
     },
     "app/cli/page.tsx": {
-      "sha256": "3b78cc93c217de05b2e8e9de9592deebe755905f308892ead0feaa811b63c51a",
+      "sha256": "d76b03741f22006e6fcb09aae09300134f036a168db829fa86b1a64da1a5e754",
       "mode": "100644"
     },
     "app/components/account-navigation-link.tsx": {
@@ -258,7 +259,7 @@
       "mode": "100644"
     },
     "app/components/agent-setup.tsx": {
-      "sha256": "c44581b3f1c4c9b907f256762b3170dbdc8195baa93a424611937513bc558166",
+      "sha256": "06de2df1cd946e027c9301156d52aa028e08b8c354ab5c31d35cb62dd288f506",
       "mode": "100644"
     },
     "app/components/checkout-button.tsx": {
@@ -478,7 +479,7 @@
       "mode": "100644"
     },
     "app/lib/docs-catalog.ts": {
-      "sha256": "2bc6609faf9c34e3b431db5776d358bdb3b5dacbcd4359a18a632608363c52a8",
+      "sha256": "2cd3904defd145543273be04d804c69fec73b79cacaa583564041d291483e633",
       "mode": "100644"
     },
     "app/lib/domain-recovery.ts": {
@@ -918,7 +919,7 @@
       "mode": "100644"
     },
     "docs/local-quickstart.md": {
-      "sha256": "a7475df260e4dcdc3c498dbadf035c9d49b8407ee6edab1650f3f30f44005ea0",
+      "sha256": "1cfb56856d2df799c36f137d44e58cbddc36c4ca9d7fb4688fc55bbd0134885d",
       "mode": "100644"
     },
     "docs/mcp-connection.md": {
@@ -930,7 +931,7 @@
       "mode": "100644"
     },
     "docs/self-hosting.md": {
-      "sha256": "98343180cd92dbbb8b031a1bcf3cd79ba231a7b37eec4ba50615419164a761ba",
+      "sha256": "5906fe87aafd009367ce7601a37566c47a2d4e0a44967d8ed42752c5cb018642",
       "mode": "100644"
     },
     "docs/trigger-authentication.md": {
@@ -1402,7 +1403,7 @@
       "mode": "100644"
     },
     "README.md": {
-      "sha256": "c6368ea461cb9d31b29477ef1abca51a352239921449264f1f6afa784aab3f4d",
+      "sha256": "2d5b81e2345719bd82ea1973434db1550d1f544bc62123f0b0775da1f885b569",
       "mode": "100644"
     },
     "scripts/assert-vps-build.mjs": {

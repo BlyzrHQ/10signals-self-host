@@ -20,7 +20,7 @@ You need **Git** and **Docker with Compose 2.24+**. Windows PowerShell, macOS Te
 ### 1. Clone
 
 ```sh
-git clone https://github.com/BlyzrHQ/10signals-self-host.git 10signals
+git clone https://github.com/10claws/10signals-self-host.git 10signals
 cd 10signals
 ```
 

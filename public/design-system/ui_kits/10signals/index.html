@@ -1,0 +1,24 @@
+<!-- @dsCard group="10 Signals app" viewport="1180x760" subtitle="Landing → progress → report → account, click-through" name="10 Signals app" -->
+<!-- @startingPoint section="Screens" subtitle="Full 10 Signals click-through" viewport="1180x760" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>10 Signals — UI kit</title><link rel="stylesheet" href="../../styles.css"><style>body{padding:0}</style>
+<meta name="viewport" content="width=device-width, initial-scale=1"><script src="/design-system/app-shell.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script><script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script><script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script><script src="../../components/_card_loader.js"></script></head><body><div id="root"></div>
+<script type="text/babel" data-presets="react">
+loadNS('../../components/', ["actions/Button.jsx","actions/IconButton.jsx","actions/FeedbackThumbs.jsx","labels/EvidencePill.jsx","labels/Tag.jsx","labels/SourceTag.jsx","navigation/Tabs.jsx","navigation/FilterChips.jsx","navigation/NavBar.jsx","forms/Input.jsx","forms/Select.jsx","forms/Segmented.jsx","surfaces/Card.jsx","surfaces/Dialog.jsx","data/DataTable.jsx","data/BenchmarkTrack.jsx","data/ProgressPhases.jsx","data/ProductMatchCard.jsx"]).then(async () => {
+  const load = async (n) => { const src = await (await fetch(n + '.jsx')).text(); const deps = Object.keys(window.NS); const code = 'const {' + deps.join(',') + '} = window.NS;\n' + src.replace(/^import[^\n]*\n/gm,'').replace(/export function/g,'function') + '\nwindow.NS.' + n + ' = ' + n + ';'; new Function('React', Babel.transform(code, { presets: [['react', { runtime: 'classic' }]] }).code)(React); };
+  for (const n of ["Landing","Progress","Report","SignIn","Account"]) await load(n);
+  const { Landing, Progress, Report, SignIn, Account } = window.NS;
+  function App(){ const [screen, setScreen] = React.useState('landing'); const [domain, setDomain] = React.useState('lumenandoak.com');
+    const go = (s) => setScreen(s);
+    const nav = [['landing','Landing'],['progress','Progress'],['report','Report'],['signin','Sign in'],['account','Account']];
+    return <div>
+      <div style={{display:'flex',gap:6,alignItems:'center',padding:'6px 14px',background:'var(--surface)',borderBottom:'1px solid var(--border)',fontSize:11,color:'var(--text-muted)'}}><span style={{letterSpacing:'.08em',textTransform:'uppercase',fontSize:10,marginInlineEnd:6}}>UI kit</span>{nav.map(([k,l]) => <button key={k} onClick={()=>go(k)} style={{border:'1px solid '+(screen===k?'var(--primary)':'var(--border-strong)'),background:screen===k?'var(--primary-tint)':'transparent',color:screen===k?'var(--primary-deep)':'var(--text-body)',padding:'3px 9px',borderRadius:999,cursor:'pointer',fontSize:11,fontFamily:'inherit'}}>{l}</button>)}</div>
+      {screen==='landing' && <Landing domain={domain} onDomain={setDomain} onRun={()=>go('progress')} onSignIn={()=>go('signin')} />}
+      {screen==='progress' && <Progress domain={domain} onDone={()=>go('report')} />}
+      {screen==='report' && <Report domain={domain} onHome={()=>go('landing')} onAccount={()=>go('account')} />}
+      {screen==='signin' && <SignIn onDone={()=>go('account')} onHome={()=>go('landing')} />}
+      {screen==='account' && <Account onHome={()=>go('landing')} onReport={()=>go('report')} onSignOut={()=>go('landing')} />}
+    </div>; }
+  ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+});
+</script></body></html>

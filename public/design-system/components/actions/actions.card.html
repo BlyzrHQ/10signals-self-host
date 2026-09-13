@@ -1,0 +1,10 @@
+<!-- @dsCard group="Components" viewport="700x200" subtitle="Button variants and sizes, IconButton, FeedbackThumbs" name="Actions" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Actions</title><link rel="stylesheet" href="../../styles.css"><style>body{padding:14px 18px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}</style>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script><script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script><script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script><script src="../_card_loader.js"></script></head><body><div id="root"></div>
+<script type="text/babel" data-presets="react">loadNS('../', ["actions/Button.jsx","actions/IconButton.jsx","actions/FeedbackThumbs.jsx","labels/EvidencePill.jsx","labels/Tag.jsx","labels/SourceTag.jsx","navigation/Tabs.jsx","navigation/FilterChips.jsx","navigation/NavBar.jsx","forms/Input.jsx","forms/Select.jsx","forms/Segmented.jsx","surfaces/Card.jsx","surfaces/Dialog.jsx","data/DataTable.jsx","data/BenchmarkTrack.jsx","data/ProgressPhases.jsx","data/ProductMatchCard.jsx"]).then(() => {
+const { Button, IconButton, FeedbackThumbs } = window.NS;
+function App(){ const [v,setV]=React.useState('up'); return <div style={{display:'grid',gap:14}}>
+<div className="row"><Button>Run report</Button><Button variant="secondary">Export CSV</Button><Button variant="ghost">Sign out</Button><Button disabled>Disabled</Button><Button size="sm">Small</Button><Button size="lg">Large hero</Button></div>
+<div className="row"><IconButton label="Expand">▾</IconButton><IconButton label="Collapse" pressed>▴</IconButton><IconButton label="Clear">×</IconButton><span style={{width:12}}/><FeedbackThumbs value={v} onChange={setV}/><span style={{fontSize:12,color:'var(--text-muted)'}}>vote: {String(v)}</span></div>
+</div>; }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);});</script></body></html>

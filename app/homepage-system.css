@@ -1,0 +1,85 @@
+@import url("/design-system/tokens/fonts.css");
+
+/* Shared navigation typography must not depend on the surrounding page. */
+.site-nav { font-family: "Plus Jakarta Sans", system-ui, sans-serif; }
+.site-nav[dir="rtl"], .site-nav .site-language[lang="ar"] { font-family: "Cairo", "Plus Jakarta Sans", system-ui, sans-serif; }
+.site-nav .site-language[lang="en"] { font-family: "Plus Jakarta Sans", system-ui, sans-serif; }
+.site-nav[dir="rtl"] nav { direction: rtl; }
+.site-nav[dir="rtl"] .site-brand { margin-left: auto; margin-right: 0; }
+
+/* Supplied 10 Signals system, scoped to the homepage; other routes retain their typography. */
+.signals-home {
+  --ds-font: "Plus Jakarta Sans", system-ui, sans-serif;
+  --ds-font-arabic: "Cairo", "Plus Jakarta Sans", system-ui, sans-serif;
+  --ds-bg: #fff; --ds-soft: #f7f9f9; --ds-ink: #0f1419;
+  --ds-ink-2: #33404a; --ds-muted: #536471; --ds-muted-2: #6e767d;
+  --ds-line: #eff3f4; --ds-line-2: #cfd9de;
+  --ds-accent: #1d9bf0; --ds-accent-deep: #0b6cb0; --ds-accent-tint: #e8f5fe;
+  --ds-radius: 14px; --ds-radius-lg: 20px; --ds-pill: 999px;
+  background: var(--ds-bg); font-family: var(--ds-font); font-size: 14px; line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.signals-home[lang="ar"], .signals-home[lang="ar"] * { font-family: var(--ds-font-arabic); }
+.signals-home .site-nav .site-language[lang="ar"] { font-family: var(--ds-font-arabic); }
+.signals-home .site-nav .site-language[lang="en"] { font-family: var(--ds-font); }
+.signals-home .site-nav[dir="rtl"] nav { direction: rtl; }
+.signals-home .site-nav[dir="rtl"] .site-brand { margin-left: auto; margin-right: 0; }
+.signals-home .ds-frame { max-width: 1180px; }
+.signals-home .ds-hero { gap: 40px; padding: 56px 0; }
+.signals-home .ds-h1 { font-family: inherit !important; font-size: clamp(30px, 3.4vw, 48px); line-height: 1.08; letter-spacing: -.02em; font-weight: 600; }
+.signals-home .signals-subtitle { font-family: inherit !important; margin: 20px 0 28px; color: var(--ds-muted); font-size: 20px; line-height: 1.5; letter-spacing: normal; }
+.signals-home .signals-subtitle span { color: var(--ds-accent-deep); }
+.signals-home .ds-input { background: var(--ds-bg); border-color: var(--ds-line-2); border-radius: var(--ds-radius); font-size: 14px; min-height: 46px; }
+.signals-home .ds-btn, .signals-home .agent-reveal, .signals-home .agent-copy, .signals-home .ds-lang { border-radius: var(--ds-pill); transition: background 200ms cubic-bezier(.2,.7,.2,1), border-color 200ms cubic-bezier(.2,.7,.2,1); }
+.signals-home .ds-hero-form .ds-btn, .signals-home .agent-reveal { background: transparent; border: 1px solid var(--ds-accent); color: var(--ds-accent-deep); font-weight: 600; min-height: 46px; padding: 0 20px; font-size: 14px; }
+.signals-home .ds-hero-form .ds-btn:hover, .signals-home .agent-reveal:hover { background: var(--ds-accent-tint); }
+.signals-home button:disabled { opacity: .45; cursor: default; }
+.signals-home .signals-animation-card, .signals-home .agent-setup { background: var(--ds-soft); border: 1px solid var(--ds-line); border-radius: var(--ds-radius); box-shadow: none; padding: 20px; }
+.signals-home .signals-animation-card { border-radius: var(--ds-radius-lg); }
+.signals-home .signals-card-heading, .signals-home .agent-eyebrow { font-family: inherit !important; color: var(--ds-muted); font-size: 10px; letter-spacing: .08em; }
+.signals-home .signals-card-heading span:last-child { color: var(--ds-muted); }
+.signals-home .ms-anim { background: var(--ds-soft); }
+.signals-home .ms-row, .signals-home .ms-report { border-radius: var(--ds-radius); }
+.signals-home .ms-thumb { border-radius: 8px; }
+.signals-home .ds-pillars, .signals-home .ds-plans { gap: 12px; }
+.signals-home .ds-pillars, .signals-home .ds-proof, .signals-home .ds-how, .signals-home .ds-pricing { margin-bottom: 56px; }
+.signals-home .ds-card { padding: 20px; border: 1px solid var(--ds-line); box-shadow: none; }
+.signals-home .ds-proof-card { border-color: var(--ds-line); border-radius: var(--ds-radius); }
+.signals-home .ds-kicker-accent, .signals-home .ds-how-n { color: var(--ds-accent-deep); }
+.signals-home .ds-pricing { max-width: none; }
+.signals-home .ds-pricing .ds-section-head { gap: 12px; margin-bottom: 20px; }
+.signals-home .ds-plans { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.signals-home .ds-plan { padding: 18px; background: var(--ds-soft); border: 0; border-radius: 14px; min-height: 186px; }
+.signals-home .ds-plan-name { font-size: 10px; font-weight: 400; letter-spacing: .1em; margin: 0 0 6px; }
+.signals-home .ds-plan-price { font-size: 26px; font-weight: 600; line-height: 1.5; margin: 0 0 4px; }
+.signals-home .ds-plan-unit { font-size: 12px; color: var(--ds-muted); margin: 0 0 10px; }
+.signals-home .ds-plan-body { font-size: 13px; color: var(--ds-ink-2); line-height: 1.5; margin: 0; }
+.signals-home .ds-plan-action { padding-top: 20px; }
+.signals-home .ds-plan-action .ds-btn:hover { background: transparent; border-color: var(--ds-accent); color: var(--ds-ink); }
+.signals-home :where(b, strong) { font-weight: 600; }
+.signals-home :where(a, button, input):focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 2px; }
+.signals-home .signals-showcase { margin-bottom: 56px; }
+.signals-home .agent-eyebrow { margin-bottom: 12px; }
+.signals-home .agent-setup h2 { font-size: 24px; line-height: 1.3; letter-spacing: -.02em; font-weight: 600; margin-bottom: 12px; }
+.signals-home .agent-description { color: var(--ds-ink-2); font-size: 14px; line-height: 1.5; margin-bottom: 20px; }
+.agent-brand-list { display: flex; flex-wrap: wrap; gap: 12px 20px; padding: 0; margin: 16px 0 20px; list-style: none; }
+.agent-brand-list li { display: inline-flex; align-items: center; gap: 8px; color: var(--ds-muted); font-size: 12px; }
+.agent-brand-list img { display: block; width: 28px; height: 28px; object-fit: contain; flex: none; }
+.signals-home .agent-setup-note { font-family: inherit !important; margin-top: 20px; font-size: 11px; color: var(--ds-muted); }
+.signals-home .agent-command-panel:not([hidden]) { animation-duration: 200ms; animation-timing-function: cubic-bezier(.2,.7,.2,1); }
+.signals-home .agent-prerequisite { color: var(--ds-muted); line-height: 1.5; margin: 20px 0 16px; }
+.signals-home .agent-terminal { background: var(--ds-bg); color: var(--ds-ink); border: 1px solid var(--ds-line-2); border-radius: var(--ds-radius); padding: 20px; }
+.signals-home .agent-terminal-head { font-family: inherit; color: var(--ds-muted); font-size: 10px; margin-bottom: 20px; }
+.signals-home .agent-command-line { gap: 12px; min-height: 46px; font-size: 13px; }
+.signals-home .agent-command-line code, .signals-home .agent-command-line code * { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.signals-home .agent-prompt { color: var(--ds-accent-deep); }
+.signals-home .agent-cursor { background: var(--ds-accent); }
+.signals-home .agent-copy { border-color: var(--ds-line-2); padding: 6px 12px; min-height: 34px; background: transparent; color: var(--ds-ink); font-size: 13px; }
+.signals-home .agent-copy:hover { border-color: var(--ds-accent); background: var(--ds-line); }
+.signals-home .agent-security, .signals-home .agent-copy-status { color: var(--ds-muted); line-height: 1.5; }
+.signals-home .signals-badge { font-family: inherit !important; padding: 4px 10px; background: transparent; border-color: var(--ds-line-2); color: var(--ds-muted); font-size: 11px; letter-spacing: normal; }
+@media (max-width: 900px) { .signals-home .ds-hero { padding: 40px 0; gap: 28px; } }
+@media (max-width: 900px) and (min-width: 521px) { .signals-home .ds-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .signals-home .ds-plans { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) { .signals-home .signals-animation-card, .signals-home .agent-setup, .signals-home .ds-card { padding: 16px; } .signals-home .signals-subtitle { font-size: 17px; } }
+@media (prefers-reduced-motion: reduce) { .signals-home :where(button, a) { transition: none; } }

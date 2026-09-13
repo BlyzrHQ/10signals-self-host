@@ -1,0 +1,10 @@
+/* Base resets and the few global rules the system needs. */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: var(--text-md); line-height: var(--leading-normal); -webkit-font-smoothing: antialiased; }
+[lang="ar"], [lang="ar"] * { font-family: var(--font-arabic); }
+a { color: var(--primary); text-underline-offset: 3px; }
+a:hover { color: var(--primary-hover); }
+button, input, select, textarea { font: inherit; }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+::selection { background: var(--primary-ring); }

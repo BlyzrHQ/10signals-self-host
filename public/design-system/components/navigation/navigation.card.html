@@ -1,0 +1,12 @@
+<!-- @dsCard group="Components" viewport="700x210" subtitle="NavBar, Tabs with Planned, FilterChips" name="Navigation" -->
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Navigation</title><link rel="stylesheet" href="../../styles.css"><style>body{padding:14px 18px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}</style>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script><script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script><script src="https://unpkg.com/@babel/standalone@7.26.4/babel.min.js"></script><script src="../_card_loader.js"></script></head><body><div id="root"></div>
+<script type="text/babel" data-presets="react">loadNS('../', ["actions/Button.jsx","actions/IconButton.jsx","actions/FeedbackThumbs.jsx","labels/EvidencePill.jsx","labels/Tag.jsx","labels/SourceTag.jsx","navigation/Tabs.jsx","navigation/FilterChips.jsx","navigation/NavBar.jsx","forms/Input.jsx","forms/Select.jsx","forms/Segmented.jsx","surfaces/Card.jsx","surfaces/Dialog.jsx","data/DataTable.jsx","data/BenchmarkTrack.jsx","data/ProgressPhases.jsx","data/ProductMatchCard.jsx"]).then(() => {
+const { NavBar, Tabs, FilterChips, Tag, Button } = window.NS;
+function App(){ const [t,setT]=React.useState('products'); const [f,setF]=React.useState('');
+return <div style={{display:'grid',gap:10}}>
+<NavBar logoSrc="../../assets/logo-dot.png" badge={<Tag variant="outline">Private preview</Tag>} crumbs={['lumenandoak.com']} meta="Observed 14 Aug 2026 · Report v1"><Button variant="ghost" size="sm">Sign in</Button></NavBar>
+<Tabs value={t} onChange={setT} tabs={[{key:'competitors',label:'Competitors',count:4},{key:'products',label:'Products',count:27},{key:'benchmark',label:'Benchmark',count:6},{key:'ads',label:'Advertising',planned:true},{key:'ev',label:'Evidence & Method',planned:true}]} trailing={<span style={{fontSize:11,color:'var(--text-faint)'}}>#{t}</span>}/>
+<FilterChips label="Competitor" value={f} onChange={setF} options={[{key:'',label:'All',count:27},{key:'hearthwick.co',label:'hearthwick.co',count:12},{key:'emberfield.com',label:'emberfield.com',count:8},{key:'northlightcandles.com',label:'northlightcandles.com',count:5}]}/>
+</div>; }
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);});</script></body></html>

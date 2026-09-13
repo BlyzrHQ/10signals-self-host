@@ -1,0 +1,81 @@
+# Local-only preview. Exported as compose.yaml in the public distribution.
+# Public amd64/arm64 candidate, pinned by digest. Owner acceptance is pending.
+x-app: &app
+  image: ghcr.io/blyzrhq/10signals-self-host@sha256:b836ee55c2e3c7e21f0d3e4a5bcd6909623db4e207f3588317f5b46ac0a15705
+  init: true
+  restart: unless-stopped
+  read_only: true
+  tmpfs: ["/tmp:size=128m,mode=1777"]
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  volumes: [application-data:/data]
+x-runtime: &runtime
+  MARKET_SIGNAL_MODE: self-hosted
+  MARKET_SIGNAL_DEPLOY_TARGET: node
+  MARKET_SIGNAL_EXECUTION_BACKEND: local
+  MARKET_SIGNAL_HOSTED_BILLING: "false"
+  MARKET_SIGNAL_SQLITE_PATH: /data/10signals.sqlite
+services:
+  setup:
+    image: ghcr.io/blyzrhq/10signals-self-host@sha256:b836ee55c2e3c7e21f0d3e4a5bcd6909623db4e207f3588317f5b46ac0a15705
+    profiles: [setup]
+    user: "0:0"
+    working_dir: /setup
+    entrypoint: [node, /app/scripts/setup-local.mjs]
+    network_mode: none
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    volumes: [".:/setup"]
+  web:
+    <<: *app
+    command: [node, --experimental-strip-types, scripts/start-local.ts]
+    environment:
+      <<: *runtime
+      MARKET_SIGNAL_PROCESS_ROLE: app
+      MARKET_SIGNAL_LOCAL_HTTP: "true"
+      BETTER_AUTH_URL: http://localhost:${TEN_SIGNALS_PORT:-8787}
+      BETTER_AUTH_SECRET: ${TEN_SIGNALS_AUTH_SECRET:-}
+      MARKET_SIGNAL_SELF_HOST_ALLOW_SIGNUP: "true"
+  worker:
+    <<: *app
+    command: [node, --experimental-strip-types, scripts/local-worker.ts]
+    stop_grace_period: 10m
+    environment:
+      <<: *runtime
+      MARKET_SIGNAL_PROCESS_ROLE: worker
+      OPENAI_API_KEY: ${TEN_SIGNALS_PROVIDER_KEY:-}
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, --experimental-strip-types, scripts/local-worker-health.ts]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+  gateway:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/data/caddy:size=8m,mode=0700", "/config/caddy:size=1m,mode=0700"]
+    cap_drop: [ALL]
+    # The official Caddy binary carries this file capability, even on port 8080.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:${TEN_SIGNALS_PORT:-8787}:8080"]
+    environment:
+      TEN_SIGNALS_PORT: ${TEN_SIGNALS_PORT:-8787}
+    volumes:
+      - ./deploy/self-host/Caddyfile.local:/etc/caddy/Caddyfile:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null --header="Host: localhost:$$TEN_SIGNALS_PORT" http://127.0.0.1:8080/']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  application-data:

@@ -1,0 +1,4 @@
+{$SELF_HOST_HOSTNAME:localhost} {
+  tls internal
+  reverse_proxy web:3000
+}

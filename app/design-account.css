@@ -1,0 +1,184 @@
+/* design-account: page-specific layout for the supplied 10 Signals design (sign in, account,
+   OAuth consent, price watch, CLI). Uses tokens and primitives from design-system.css. */
+
+/* ---------- Shared bits ---------- */
+.acct-page { min-height: 100vh; background: var(--ds-bg); color: var(--ds-ink); font-family: var(--ds-font); }
+.acct-page[lang="ar"] { font-family: var(--ds-font-arabic); }
+.acct-brand { margin-bottom: 36px; }
+.acct-kicker-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.acct-sub { color: var(--ds-muted); margin: 0 0 22px; font-size: 14px; }
+.acct-form { display: grid; gap: 12px; }
+.acct-submit { margin-top: 4px; }
+.acct-switch { margin-top: 16px; }
+.acct-note-bottom { margin-top: 28px; }
+.acct-alert { display: flex; gap: 6px; align-items: baseline; }
+.acct-btn-accent { font-weight: 600; padding: 6px 14px; }
+.acct-btn-save { font-weight: 600; padding: 7px 16px; }
+.acct-btn-key { font-weight: 600; min-height: 40px; padding: 0 16px; justify-self: start; }
+.acct-start { justify-self: start; }
+.acct-code { display: block; min-width: 0; font: 12px/1.5 var(--ds-mono); color: var(--ds-ink); background: var(--ds-bg); border: 1px solid var(--ds-line-2); border-radius: var(--ds-radius-md); padding: 8px 10px; direction: ltr; unicode-bidi: isolate; text-align: start; }
+.acct-code-line { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+pre.acct-code { margin: 0; overflow-x: auto; white-space: pre; }
+.acct-loading { padding: 64px 0; color: var(--ds-muted); font-size: 14px; }
+
+/* ---------- Account header + identity ---------- */
+.acct-identity { display: flex; align-items: center; gap: 10px; margin: 14px 0 22px; }
+.acct-name { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.acct-email { margin: 0; font-size: 13px; color: var(--ds-muted); text-align: start; overflow-wrap: anywhere; }
+
+/* ---------- Account layout ---------- */
+.acct-layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 28px; align-items: start; }
+.acct-nav { display: grid; gap: 2px; position: sticky; top: 16px; }
+.acct-nav button { text-align: start; border: 0; background: transparent; color: var(--ds-ink-2); padding: 8px 12px; border-radius: var(--ds-pill); cursor: pointer; font-size: 14px; font-weight: 400; }
+.acct-nav button:hover { background: var(--ds-ink-hover); }
+.acct-nav button[aria-current="true"] { background: var(--ds-accent-tint); color: var(--ds-accent-deep); font-weight: 600; }
+.acct-sections { display: grid; gap: 14px; min-width: 0; }
+.acct-section { background: var(--ds-soft); border-radius: var(--ds-radius); padding: 18px 20px; min-width: 0; }
+.acct-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.acct-head-tight { margin-bottom: 6px; }
+.acct-head .ds-spacer { flex: 1; }
+.acct-head-note { font-size: 12px; color: var(--ds-muted); }
+.acct-body { margin: 0 0 14px; font-size: 13px; color: var(--ds-muted); max-width: 640px; }
+.acct-section-note { margin-top: 12px; }
+.acct-rows { display: grid; gap: 4px; }
+.acct-empty { margin: 0; font-size: 13px; color: var(--ds-muted); padding: 10px 12px; background: var(--ds-bg); border: 1px dashed var(--ds-line-2); border-radius: var(--ds-radius); }
+
+/* My reports rows */
+.acct-report { display: grid; grid-template-columns: minmax(0, 1.4fr) auto auto; gap: 14px; align-items: center; text-align: start; padding: 10px 12px; background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: var(--ds-radius); color: var(--ds-ink); text-decoration: none; font: inherit; font-size: 14px; cursor: pointer; min-width: 0; }
+.acct-report:hover { border-color: var(--ds-accent); color: var(--ds-ink); }
+.acct-report-domain { font-size: 14px; text-align: start; overflow-wrap: anywhere; }
+.acct-report-meta { font-size: 12px; color: var(--ds-muted); }
+.acct-status { letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; }
+.acct-date { font-size: 12px; color: var(--ds-muted-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Plan & usage */
+.acct-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.acct-stat { background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: var(--ds-radius); padding: 12px 14px; min-width: 0; }
+.acct-stat > .ds-label { margin-bottom: 4px; }
+.acct-stat-value { margin: 0; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.acct-stat-value small { font-size: 13px; color: var(--ds-muted); font-weight: 400; }
+.acct-stat-sub { margin: 2px 0 0; font-size: 12px; color: var(--ds-muted); }
+.acct-bar { height: 6px; background: var(--ds-line); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.acct-bar > span { display: block; height: 100%; background: var(--ds-accent); }
+.acct-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.acct-plan { background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: var(--ds-radius); padding: 12px 14px; display: grid; gap: 2px; align-content: start; }
+.acct-plan-current { border-color: var(--ds-accent); }
+.acct-plan > .ds-label { margin-bottom: 4px; color: var(--ds-accent); }
+.acct-plan-price { margin: 0; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.acct-plan-price span { font-size: 12px; color: var(--ds-muted); font-weight: 400; }
+.acct-plan-body { margin: 0; font-size: 12px; color: var(--ds-muted); }
+.acct-plan-btn { margin-top: 8px; justify-self: start; }
+.acct-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+.acct-actions .ds-note { flex-basis: 100%; }
+
+/* Profile */
+.acct-profile { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 640px; }
+.acct-seg { display: inline-flex; border: 1px solid var(--ds-line-2); border-radius: var(--ds-pill); overflow: hidden; background: var(--ds-bg); justify-self: start; }
+.acct-seg button { border: 0; background: transparent; color: var(--ds-ink-2); padding: 7px 14px; font-size: 13px; cursor: pointer; }
+.acct-seg button + button { border-inline-start: 1px solid var(--ds-line-2); }
+.acct-seg button[aria-pressed="true"] { background: var(--ds-accent-tint); color: var(--ds-accent-deep); }
+.acct-password { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 640px; margin-top: 12px; align-items: end; }
+.acct-divider { margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--ds-line); }
+.acct-divider > .ds-label { margin-bottom: 4px; }
+.acct-divider p { margin: 0 0 8px; font-size: 13px; color: var(--ds-ink-2); }
+
+/* API keys */
+.acct-key-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; align-items: end; margin-bottom: 12px; }
+.acct-reveal { background: var(--ds-accent-tint); border-radius: var(--ds-radius); padding: 12px 14px; margin-bottom: 12px; font-size: 13px; color: var(--ds-ink); }
+.acct-reveal > p { margin: 0 0 6px; font-weight: 600; }
+.acct-reveal-row { display: flex; gap: 8px; align-items: center; }
+.acct-reveal > .ds-note { margin-top: 8px; }
+.acct-reveal > .ds-note code { font-family: var(--ds-mono); font-size: 11px; }
+.acct-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 10px 12px; background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: var(--ds-radius); font-size: 13px; min-width: 0; }
+.acct-row-title { display: block; overflow-wrap: anywhere; }
+.acct-row-sub { font-size: 12px; color: var(--ds-muted); display: block; text-align: start; overflow-wrap: anywhere; }
+.acct-row-meta { font-size: 12px; color: var(--ds-muted-2); }
+
+/* ---------- OAuth consent ---------- */
+.consent-nav { padding-bottom: 0; }
+.consent-frame { max-width: 560px; margin: 0 auto; padding: 40px 28px 80px; }
+.consent-frame > .ds-h1-xs { margin-bottom: 12px; }
+.consent-client { display: grid; gap: 4px; padding: 12px 14px; background: var(--ds-bg); border: 1px solid var(--ds-line-2); border-radius: var(--ds-radius); margin-bottom: 12px; }
+.consent-client strong { font-size: 15px; font-weight: 600; }
+.consent-lead { margin: 0 0 12px; font-size: 14px; color: var(--ds-ink-2); }
+.consent-scopes { display: grid; gap: 4px; margin-bottom: 12px; }
+.consent-scope { padding: 10px 12px; background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: var(--ds-radius); }
+.consent-scope strong { display: block; font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.consent-scope p { margin: 0; font-size: 13px; color: var(--ds-muted); }
+.consent-frame .ds-alert { margin-bottom: 12px; }
+.consent-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.consent-actions .ds-btn { min-height: 40px; padding: 0 18px; font-weight: 600; font-size: 14px; }
+.consent-frame > .ds-note { margin-top: 16px; }
+
+/* ---------- Price watch ---------- */
+.watch-hero { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding: 36px 0 24px; flex-wrap: wrap; }
+.watch-hero .ds-kicker { margin-bottom: 8px; }
+.watch-hero .ds-h1-md { margin-bottom: 8px; }
+.watch-hero p { margin: 0; max-width: 620px; font-size: 14px; color: var(--ds-muted); }
+.watch-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .34fr); gap: 18px; align-items: start; margin-top: 14px; }
+.watch-list { display: grid; gap: 10px; min-width: 0; }
+.watch-list .acct-head { margin-bottom: 2px; }
+.ds-page .price-watch-card { margin: 0; background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: var(--ds-radius); padding: 12px 14px; display: grid; gap: 10px; min-width: 0; }
+.watch-top { display: flex; align-items: start; gap: 12px; }
+.watch-top > div { min-width: 0; flex: 1; }
+.watch-domain { display: block; font-size: 12px; color: var(--ds-muted); text-align: start; overflow-wrap: anywhere; }
+.watch-product { display: block; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.watch-price { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.watch-price strong { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.watch-price small { font-size: 12px; color: var(--ds-muted); }
+.watch-controls { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.watch-controls .ds-field { flex: 1 1 190px; }
+.watch-controls .watch-switch { align-self: center; min-height: 40px; }
+.ds-page .watch-switch b { font-size: 12px; color: var(--ds-ink-2); font-weight: 400; }
+.watch-reason { margin: 0; font-size: 12px; color: var(--ds-ink-2); text-transform: capitalize; }
+.watch-foot { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+.watch-foot a { font-size: 13px; text-decoration: none; }
+.watch-history { list-style: none; margin: 0; padding: 10px 0 0; border-top: 1px solid var(--ds-line); display: grid; gap: 8px; }
+.watch-history li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; }
+.watch-history li.watch-history-empty { grid-template-columns: 1fr; color: var(--ds-muted); }
+.watch-history i { width: 8px; height: 8px; border-radius: 50%; background: var(--ds-accent); }
+.watch-history strong { display: block; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.watch-history span { display: block; font-size: 12px; color: var(--ds-muted); text-transform: capitalize; }
+.watch-history time { font-size: 12px; color: var(--ds-muted-2); font-variant-numeric: tabular-nums; }
+.watch-alerts { display: grid; gap: 4px; }
+.watch-alerts .acct-head { margin-bottom: 2px; }
+.watch-alert { display: grid; grid-template-columns: 8px minmax(0, 1fr); gap: 10px; align-items: start; padding: 10px 12px; background: var(--ds-bg); border: 1px solid var(--ds-line); border-radius: var(--ds-radius); }
+.watch-alert i { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--ds-line-2); }
+.watch-alert.unread i { background: var(--ds-accent); box-shadow: 0 0 8px var(--ds-accent); }
+.watch-alert strong { display: block; font-size: 13px; font-weight: 600; }
+.watch-alert p { margin: 2px 0; font-size: 12px; color: var(--ds-muted); }
+.watch-alert time { font-size: 11px; color: var(--ds-muted-2); font-variant-numeric: tabular-nums; }
+.watch-empty { display: grid; gap: 6px; justify-items: start; }
+.watch-empty p { margin: 0; font-size: 13px; color: var(--ds-muted); }
+.watch-empty .ds-btn { margin-top: 6px; }
+
+/* ---------- CLI ---------- */
+.cli-hero { padding: 36px 0 24px; }
+.cli-hero .ds-kicker { margin-bottom: 8px; }
+.cli-hero .ds-h1-md { margin-bottom: 8px; }
+.cli-hero p { margin: 0; max-width: 620px; font-size: 14px; color: var(--ds-muted); }
+.cli-grid { display: grid; gap: 14px; }
+.cli-step { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; }
+.cli-step > span { font-size: 12px; color: var(--ds-accent); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.cli-step .ds-h3 { margin-bottom: 6px; }
+.cli-step p { margin: 0 0 10px; font-size: 13px; color: var(--ds-muted); max-width: 720px; }
+.cli-handoff { display: grid; gap: 8px; justify-items: start; }
+.cli-handoff p { margin: 0; font-size: 13px; color: var(--ds-muted); max-width: 720px; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 700px) {
+  .acct-layout { grid-template-columns: 1fr; gap: 16px; }
+  .acct-nav { position: static; display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .acct-nav button { white-space: nowrap; flex: none; }
+  .acct-identity { flex-wrap: wrap; }
+  .acct-stats, .acct-profile, .acct-password { grid-template-columns: 1fr; }
+  .acct-report { grid-template-columns: minmax(0, 1fr) auto; }
+  .acct-report .acct-date { grid-column: 1 / -1; }
+  .acct-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .acct-row .acct-row-meta { grid-column: 1 / -1; }
+  .acct-reveal-row { flex-wrap: wrap; }
+  .acct-reveal-row .acct-code { flex-basis: 100%; }
+  .consent-frame { padding: 24px 16px 60px; }
+  .watch-grid { grid-template-columns: 1fr; }
+  .cli-step { grid-template-columns: 1fr; gap: 6px; }
+}

@@ -7,6 +7,7 @@ import { AgentSetup } from "./components/agent-setup";
 import { HowItWorksSection, LandingPricingSection } from "./components/landing-sections";
 import { postJson } from "./lib/json-response";
 import { ReportResearchControls, DEFAULT_RESEARCH_CONTROLS } from "./components/report-research-controls";
+import { LocalSetupNotice } from "./components/local-setup-notice";
 
 type Locale = "en" | "ar";
 type CreateReportResponse =
@@ -109,6 +110,7 @@ export default function Home() {
             <input id="domain" className="ds-input" value={domain} onChange={(event) => setDomain(event.target.value)} placeholder={ar ? "yourstore.com أو رابط كامل" : "yourstore.com or a full URL"} dir="ltr" autoCapitalize="none" autoCorrect="off" />
             <button className="ds-btn ds-btn-primary ds-btn-lg" type="submit" disabled={isAnalyzing}>{isAnalyzing ? (ar ? "جارٍ إنشاء التقرير…" : "Starting report…") : (ar ? "أنشئ التقرير" : "Run report")}</button>
           </form>
+          <LocalSetupNotice />
           <p className="ds-note ds-hero-note">{ar ? "صفحات عامة فقط. يستغرق التقرير من 3 إلى 8 دقائق ويُحفظ برابط قابل للمشاركة." : "Public pages only. Reports take 3–8 minutes and save to a shareable link."}</p>
           <div className="ds-hero-research"><ReportResearchControls value={research} onChange={setResearch} disabled={isAnalyzing} ar={ar} /></div>
           {analysisError && <p className="ds-alert ds-hero-error" role="alert">{analysisError}</p>}

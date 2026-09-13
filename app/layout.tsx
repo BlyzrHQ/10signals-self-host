@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DesignAnnotations } from "./components/design-annotations";
+import { localHttpOrigin } from "./lib/local-http";
 import { Open_Sans, IBM_Plex_Sans_Arabic, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./ten-signals.css";
@@ -31,5 +32,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body className={`${geistSans.variable} ${arabicSans.variable} ${geistMono.variable}`}>{children}{process.env.NODE_ENV === "development" && <DesignAnnotations />}</body></html>;
+  return <html lang="en"><body data-local-self-host={localHttpOrigin() ? "true" : undefined} className={`${geistSans.variable} ${arabicSans.variable} ${geistMono.variable}`}>{children}{process.env.NODE_ENV === "development" && <DesignAnnotations />}</body></html>;
 }

@@ -1,10 +1,13 @@
 import { selfHostedEnabled } from "./self-host-config.ts";
+import { localHttpOrigin, localHttpRequestAllowed } from "./local-http.ts";
 
 export function mutationRequestIsSameOrigin(request: Request) {
   const origin = request.headers.get("origin");
   // The local TLS gateway forwards to an HTTP container. Compare against the
   // operator-owned canonical origin, never an untrusted forwarded Host header.
   if (selfHostedEnabled()) {
+    const localOrigin = localHttpOrigin();
+    if (localOrigin) return origin === localOrigin && localHttpRequestAllowed(request);
     try {
       const expected = new URL(process.env.BETTER_AUTH_URL || "");
       return Boolean(origin && expected.protocol === "https:" && new URL(origin).origin === expected.origin);

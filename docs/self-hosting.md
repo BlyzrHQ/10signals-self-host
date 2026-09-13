@@ -1,5 +1,9 @@
 # Self-host 10Signals — candidate
 
+This is the legacy HTTPS/source-build path. The simpler prebuilt-container
+[local quickstart](local-quickstart.md) is the default public local preview; existing
+installations should keep using this guide until a migration is explicitly tested.
+
 This installs the UI, accounts, private reports, SQLite storage and local report
 worker. It does not connect to our company Trigger account or VPS. AI/search still
 uses **your own provider account** and can incur charges. This is not an offline AI.

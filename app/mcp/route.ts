@@ -164,9 +164,10 @@ export async function POST(request: Request) {
   return postTenSignalsMcp(request);
 }
 
-export async function GET() { return nonPostTenSignalsMcp(); }
-export async function HEAD() { return nonPostTenSignalsMcp(); }
-export async function OPTIONS() { return nonPostTenSignalsMcp(); }
-export async function PUT() { return nonPostTenSignalsMcp(); }
-export async function PATCH() { return nonPostTenSignalsMcp(); }
-export async function DELETE() { return nonPostTenSignalsMcp(); }
+const otherMethod = () => nonPostTenSignalsMcp();
+export const GET = otherMethod;
+export const HEAD = otherMethod;
+export const OPTIONS = otherMethod;
+export const PUT = otherMethod;
+export const PATCH = otherMethod;
+export const DELETE = otherMethod;

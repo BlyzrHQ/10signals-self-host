@@ -6,9 +6,16 @@ AI/search calls use your own provider account; no company Trigger key is include
 
 ## Install
 
-This is a **source-build preview**, not yet a production-ready release. You need
-Git, Docker with Compose, and Node.js 22.18+. Windows PowerShell and macOS Terminal
-use the same commands below. No GitHub login is required.
+Looking for the right path? Start with the [documentation index](docs/README.md).
+It separates product usage, Cloud, self-hosting, Trigger CLI, API and MCP.
+
+The default `main` branch contains the **local quickstart preview**, including
+**Account → AI provider**. No feature branch is required. This is not a production
+release, and cloning into a fresh folder does not migrate an existing installation.
+
+You need Git and a running Docker installation with Compose 2.24+. No Node.js,
+npm, Go, GitHub login or certificate installation is needed. Windows PowerShell,
+macOS Terminal and Linux use the same four commands.
 
 ```text
 git clone https://github.com/BlyzrHQ/10signals-self-host.git 10signals
@@ -19,30 +26,54 @@ cd 10signals
 ```
 
 ```text
-node scripts/setup-self-host.mjs
+docker compose run --rm setup
 ```
 
-Enter your own provider key at the hidden prompt. Never paste it into an issue or
-commit the generated `.env.self-host`. For installation-only testing, use
-`node scripts/setup-self-host.mjs --without-provider` instead.
+Setup creates private configuration automatically. No key is requested in the
+terminal. Never commit the generated `.env`. Docker downloads a prebuilt image;
+nothing is compiled on your computer. Setup does not start research.
 
 ```text
-docker compose --env-file .env.self-host -f compose.self-host.yaml --profile research up --build -d
+docker compose up -d --wait
 ```
 
-Omit `--profile research` if you skipped the provider key. Open your local instance
-at `https://localhost:8443` after following the installation-specific certificate
-instructions in the [full setup guide](docs/self-hosting.md).
+The app, local worker and gateway start together. Open
+[http://localhost:8787](http://localhost:8787) and create a local account.
+Open **Account → AI provider**, enter your own OpenAI API key, and select
+**Test & save**. Then create a report. There is no worker restart or Trigger key.
+The [provider settings page](http://localhost:8787/account?section=provider) has a
+masked **OpenAI API key** field and a **Test & save** button. On success it says
+“Key and model access checked. Saved for your account.” Do not use `--set-key` or
+paste a key into a terminal command.
+Each account has its own encrypted key. The test checks authentication and model
+visibility, not billing credit or successful inference. Missing or rejected keys
+do not start a report. Replace or remove your key from the same screen.
+See the [quickstart guide](docs/local-quickstart.md)
+for ports, updates, backups and troubleshooting. Existing HTTPS/source-build
+installations should keep using [their guide](docs/self-hosting.md).
+
+**Port already allocated?** Do not open the address until this installation's
+gateway is healthy: another installation may be serving that port. Stop the old
+installation from its own folder with `docker compose stop`, or choose a free
+port on first setup, for example `docker compose run --rm setup --port 8788`.
+Open the port printed by setup. Use a new folder name if `10signals` already exists.
+Compose derives its project name from the folder name: use a distinct name made
+of letters, numbers and hyphens. Two folders named `10signals` can share Docker
+state even under different parent directories; adding `+` is not a distinct name.
+See [existing installations and backups](docs/local-quickstart.md#updates-and-existing-installations)
+before updating; never delete volumes to fix a port conflict.
 
 This candidate binds only to your own computer. Do not expose it publicly by
-changing the port binding. Local API/MCP connections and scheduled price watches
-are not enabled yet. Live local research, successful sharing, public-server
+changing the port binding or opening a tunnel. Other users of a shared computer
+can reach localhost: use a trusted personal computer. The general local account API and scheduled price watches are not enabled yet. MCP connects to a separate hosted account; it does not expose this installation.
+Live local research, successful sharing, public-server
 hardening and dependency remediation remain release gates.
 
 ## What is included
 
 - 10Signals application and account-owned report storage.
 - Local background report worker and shared comparison engine.
+- Account-specific OpenAI key settings: test, encrypted save, replace and remove.
 - Container configuration, setup guide and local queue tests.
 - Public source evidence and visible report limitations; demo assets are UI examples.
 
@@ -62,7 +93,12 @@ before integrating into the source project and publishing a new snapshot. Public
 contributions never execute on our production infrastructure.
 
 Back up your data and private configuration before updating. Stop your local
-containers, run `git pull --ff-only`, review the release notes, rebuild, and verify
+containers and back up both `application-data` and `provider-private` volumes
+together with `.env`. Together these backups can decrypt saved provider keys;
+protect them as credentials. Losing the private-key volume makes saved keys
+unusable; restore the matching backup rather than generating a new key. Stop your
+containers, run `git pull --ff-only`, review the release notes, pull the newly
+pinned image with `docker compose pull`, run `docker compose up -d --wait`, and verify
 your accounts and reports. Do not run `docker compose down --volumes` unless you
 intend to delete your installation's data.
 

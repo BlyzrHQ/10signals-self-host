@@ -1,105 +1,68 @@
 # 10Signals
 
-Self-host 10Signals to research a domain and compare products with public prices.
-Your accounts, reports and background worker run on your own infrastructure.
-AI/search calls use your own provider account; no company Trigger key is included.
+Competitive product research, on your infrastructure.
 
-## Install
+Enter a domain to find product comparisons, competitor prices, and the public sources behind them.
 
-Looking for the right path? Start with the [documentation index](docs/README.md).
-It separates product usage, Cloud, self-hosting, Trigger CLI, API and MCP.
+[Use Cloud](https://10signals.xyz/) · [Documentation](docs/README.md) · [CLI package](https://www.npmjs.com/package/@10signals/cli)
 
-The default `main` branch contains the **local quickstart preview**, including
-**Account → AI provider**. No feature branch is required. This is not a production
-release, and cloning into a fresh folder does not migrate an existing installation.
+## Cloud or self-hosted?
 
-You need Git and a running Docker installation with Compose 2.24+. No Node.js,
-npm, Go, GitHub login or certificate installation is needed. Windows PowerShell,
-macOS Terminal and Linux use the same four commands.
+- **Cloud:** use [10signals.xyz](https://10signals.xyz/) without installing anything.
+- **Self-hosted:** run 10Signals locally and use your own OpenAI account. Follow the steps below.
 
-```text
+Self-hosting is currently a **local preview**. It is not ready for a publicly exposed server. Successful research with your valid provider key remains an acceptance test.
+
+## Quick start
+
+You need **Git** and **Docker with Compose 2.24+**. Windows PowerShell, macOS Terminal, and Linux use the same commands. No Node.js, npm, or GitHub login is required.
+
+### 1. Clone
+
+```sh
 git clone https://github.com/BlyzrHQ/10signals-self-host.git 10signals
-```
-
-```text
 cd 10signals
 ```
 
-```text
+### 2. Set up
+
+```sh
 docker compose run --rm setup
 ```
 
-Setup creates private configuration automatically. No key is requested in the
-terminal. Never commit the generated `.env`. Docker downloads a prebuilt image;
-nothing is compiled on your computer. Setup does not start research.
+This creates private configuration. Docker downloads the prebuilt image; nothing is compiled on your computer.
 
-```text
+### 3. Start
+
+```sh
 docker compose up -d --wait
 ```
 
-The app, local worker and gateway start together. Open
-[http://localhost:8787](http://localhost:8787) and create a local account.
-Open **Account → AI provider**, enter your own OpenAI API key, and select
-**Test & save**. Then create a report. There is no worker restart or Trigger key.
-The [provider settings page](http://localhost:8787/account?section=provider) has a
-masked **OpenAI API key** field and a **Test & save** button. On success it says
-“Key and model access checked. Saved for your account.” Do not use `--set-key` or
-paste a key into a terminal command.
-Each account has its own encrypted key. The test checks authentication and model
-visibility, not billing credit or successful inference. Missing or rejected keys
-do not start a report. Replace or remove your key from the same screen.
-See the [quickstart guide](docs/local-quickstart.md)
-for ports, updates, backups and troubleshooting. Existing HTTPS/source-build
-installations should keep using [their guide](docs/self-hosting.md).
+Open **[localhost:8787](http://localhost:8787)** when the services are healthy.
 
-**Port already allocated?** Do not open the address until this installation's
-gateway is healthy: another installation may be serving that port. Stop the old
-installation from its own folder with `docker compose stop`, or choose a free
-port on first setup, for example `docker compose run --rm setup --port 8788`.
-Open the port printed by setup. Use a new folder name if `10signals` already exists.
-Compose derives its project name from the folder name: use a distinct name made
-of letters, numbers and hyphens. Two folders named `10signals` can share Docker
-state even under different parent directories; adding `+` is not a distinct name.
-See [existing installations and backups](docs/local-quickstart.md#updates-and-existing-installations)
-before updating; never delete volumes to fix a port conflict.
+### 4. Add your key
 
-This candidate binds only to your own computer. Do not expose it publicly by
-changing the port binding or opening a tunnel. Other users of a shared computer
-can reach localhost: use a trusted personal computer. The general local account API and scheduled price watches are not enabled yet. MCP connects to a separate hosted account; it does not expose this installation.
-Live local research, successful sharing, public-server
-hardening and dependency remediation remain release gates.
+Create a local account, open **Account → AI provider**, enter your own **OpenAI API key**, and choose **Test & save**. Then create a report.
 
-## What is included
+Keys are encrypted for each account. The test checks key and model access, not billing credit or successful research. A key rejected during this check is not saved. Never put keys in terminal commands or Git.
 
-- 10Signals application and account-owned report storage.
-- Local background report worker and shared comparison engine.
-- Account-specific OpenAI key settings: test, encrypted save, replace and remove.
-- Container configuration, setup guide and local queue tests.
-- Public source evidence and visible report limitations; demo assets are UI examples.
+## Already have an installation?
 
-The separate `@10signals/cli` npm package connects to existing Trigger projects;
-it is not this project's installer. The managed service is at
-[10signals.xyz](https://10signals.xyz/).
+Use a distinct folder name to create an independent installation. For a different port, pass `--port 8788` to the first setup command and open that port. Keep existing data and volumes—cloning does not migrate or delete them.
 
-## Updates and contributions
+See the [installation guide](docs/local-quickstart.md) for updates, backups, port conflicts, and troubleshooting. Existing HTTPS/source-build installations have a [separate guide](docs/self-hosting.md).
 
-This repository is a one-way public source distribution maintained by BlyzrHQ.
-`PUBLIC_SOURCE.json` records the source revision and hashes for each exported file.
-No private Git history, deployment workflow, production credential or account data
-is mirrored. New export paths require an explicit reviewed allowlist update.
+## Learn more
 
-Open an issue or pull request here to propose changes. Maintainers review them
-before integrating into the source project and publishing a new snapshot. Public
-contributions never execute on our production infrastructure.
+- [Documentation and available options](docs/README.md)
+- [Trigger setup and credentials](docs/trigger-authentication.md)
+- [Connect an AI agent to hosted 10Signals](docs/mcp-connection.md)
+- [Contribute](CONTRIBUTING.md)
 
-Back up your data and private configuration before updating. Stop your local
-containers and back up both `application-data` and `provider-private` volumes
-together with `.env`. Together these backups can decrypt saved provider keys;
-protect them as credentials. Losing the private-key volume makes saved keys
-unusable; restore the matching backup rather than generating a new key. Stop your
-containers, run `git pull --ff-only`, review the release notes, pull the newly
-pinned image with `docker compose pull`, run `docker compose up -d --wait`, and verify
-your accounts and reports. Do not run `docker compose down --volumes` unless you
-intend to delete your installation's data.
+The separate `@10signals/cli` package connects to existing Trigger tasks; it is not the self-hosting installer. Hosted API/MCP and scheduled watches are not provided by this local preview.
 
-Licensed under [Apache-2.0](LICENSE). See [contributing](CONTRIBUTING.md).
+## Source and license
+
+This repository is a reviewed public source distribution. `PUBLIC_SOURCE.json` records the source revision and file hashes. Private Git history, production configuration, and account data are not included.
+
+[Apache-2.0](LICENSE)

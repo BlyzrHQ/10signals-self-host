@@ -12,7 +12,8 @@ Last checked: 14 September 2026.
 
 The self-hosting preview is **local-only**, not a hardened public-server release.
 Hosted API/MCP and scheduled watches are not enabled in this local installation.
-The own-Trigger project installer is not released. Adding a key or signing in
+Company Trigger access requires team approval; it is not a self-service project
+installer. See [team setup](trigger-authentication.md). Adding a key or signing in
 does not prove a complete research report has succeeded.
 
 ## What updates when you pull?
@@ -34,8 +35,11 @@ move container packages. Do not replace the image namespace or remove its digest
 
 This is a reviewed public distribution, not a mirror of private development
 history. `PUBLIC_SOURCE.json` records the source revision and file hashes.
-Documentation-only overlays are identified separately and do not imply a new
-runtime or image release. Public Actions are currently disabled; maintainer
+Documentation overlays are identified separately, including guide UI and its
+tests when present. The team-access update changes the source documentation UI,
+not research, authentication or the pinned image. Existing prebuilt containers
+retain their bundled docs until a separately approved image release. Public
+Actions are currently disabled; maintainer
 reviewed publication is separate from contributions or local Git pushes.
 
 Use the [documentation index](README.md) for current installation paths. Older

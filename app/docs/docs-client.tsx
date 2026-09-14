@@ -5,8 +5,9 @@ import { searchDocGuides, type DocGuide } from "../lib/docs-catalog";
 
 const directorySections = [
   { title: "Choose your path", description: "Start with the way you want to use 10Signals.", slugs: ["using-10signals", "hosted", "self-host"] },
-  { title: "Build and connect", description: "CLI, API and agent access. Connecting a client does not install the service.", slugs: ["trigger-cli", "own-trigger", "api", "mcp"] },
-  { title: "Configuration and help", description: "Credentials, providers and checks when something does not work.", slugs: ["ai-provider", "trigger-credentials", "credentials", "troubleshooting"] },
+  { title: "Connect your account", description: "API and AI-agent access to your own hosted account.", slugs: ["api", "mcp"] },
+  { title: "Configuration and help", description: "Provider settings, credentials and troubleshooting.", slugs: ["ai-provider", "credentials", "troubleshooting"] },
+  { title: "Team access", description: "For authorized teammates and agents. Request access from the team before connecting to its existing Trigger project.", slugs: ["trigger-cli", "trigger-credentials", "team-trigger"] },
 ];
 
 export function DocsDirectory({ guides }: { guides: DocGuide[] }) {

@@ -348,11 +348,11 @@
       "mode": "100644"
     },
     "app/docs/[slug]/page.tsx": {
-      "sha256": "09b4bf31a9c0809a826865c384507990d95b509d6a0a7245c3c84adbdd47ecc9",
+      "sha256": "fe0a88ddb1408d22e14cb69843b1b67f930316d34e7a2d7c98a39f95a1310196",
       "mode": "100644"
     },
     "app/docs/docs-client.tsx": {
-      "sha256": "0a73713d72b4b33e90f015ddec4f4fe251a159ea3f3d4cf49d9cd5a9941e44b8",
+      "sha256": "aead00f0357b872e1fed7223939c9048276eb18aee55f87880f04e0996218c42",
       "mode": "100644"
     },
     "app/docs/docs-sidebar.tsx": {
@@ -484,7 +484,7 @@
       "mode": "100644"
     },
     "app/lib/docs-catalog.ts": {
-      "sha256": "2cd3904defd145543273be04d804c69fec73b79cacaa583564041d291483e633",
+      "sha256": "ce9c3c7933053fba3ecb16a6c28e42747212b01886c528f7b37126ca4ebb2c8f",
       "mode": "100644"
     },
     "app/lib/domain-recovery.ts": {
@@ -932,7 +932,7 @@
       "mode": "100644"
     },
     "docs/README.md": {
-      "sha256": "a8a1f84e1141a612c2283d68387bfc69735306b24f387c9ba4a2b8fde3e82e32",
+      "sha256": "47364448b980ab1417192f361f7a03425f370863c924c7b79034634d765b6d7c",
       "mode": "100644"
     },
     "docs/self-hosting.md": {
@@ -940,7 +940,7 @@
       "mode": "100644"
     },
     "docs/trigger-authentication.md": {
-      "sha256": "dea7a677a66509af36cb4e230d88c58864247526de68e69e433d829159ce3c86",
+      "sha256": "2f717c249073175a14c10fa897915876fb439d92573f3a4a498f21dc5febb35a",
       "mode": "100644"
     },
     "eslint.config.mjs": {
@@ -960,7 +960,7 @@
       "mode": "100644"
     },
     "package.json": {
-      "sha256": "acdc99b8886dec0e99b7042eebd78ce408e45287f69ffeaa568b8ac4e07dadc3",
+      "sha256": "10c371819cb0806d42afd9ea3ba194e2e620323a5550b027ed11a8d7f1020956",
       "mode": "100644"
     },
     "postcss.config.mjs": {
@@ -1408,7 +1408,7 @@
       "mode": "100644"
     },
     "README.md": {
-      "sha256": "fadbd58e55ca9380a408a5883b5141b51b3bde2f2bd7db60c908686b2ef11764",
+      "sha256": "ad2283ee8c81839eb0c555f9efa4ae753a09c96bdd3b0b62dbb1008c374bdde4",
       "mode": "100644"
     },
     "scripts/assert-vps-build.mjs": {
@@ -1660,7 +1660,11 @@
       "mode": "100644"
     },
     "docs/release-status.md": {
-      "sha256": "6dbee42965ed284b3e2df3ce0c5a96b43120802406acefdbbf6a29aeab910987",
+      "sha256": "88b4ccf8a3f0e4aaa608194f2f0d82e1e08d91b0c3c91ec686b134872c385d4b",
+      "mode": "100644"
+    },
+    "tests/team-trigger-docs.test.mjs": {
+      "sha256": "a00634a53de8b83ce8c43c5415f01ab52552559dcd955bea26514cd09c5f0a18",
       "mode": "100644"
     }
   },
@@ -1675,6 +1679,25 @@
         "docs/release-status.md"
       ],
       "runtimeChanged": false
+    },
+    {
+      "date": "2026-09-14",
+      "kind": "documentation-ui-and-tests",
+      "basePublicCommit": "77467586c0990390d5751ba21052e6496448a36e",
+      "files": [
+        "README.md",
+        "app/docs/[slug]/page.tsx",
+        "app/docs/docs-client.tsx",
+        "app/lib/docs-catalog.ts",
+        "docs/README.md",
+        "docs/release-status.md",
+        "docs/trigger-authentication.md",
+        "package.json",
+        "tests/team-trigger-docs.test.mjs"
+      ],
+      "documentationUiChanged": true,
+      "researchOrAuthenticationChanged": false,
+      "prebuiltImageChanged": false
     }
   ]
 }

@@ -4,7 +4,7 @@ Competitive product research, on your infrastructure.
 
 Enter a domain to find product comparisons, competitor prices, and the public sources behind them.
 
-[Use Cloud](https://10signals.xyz/) · [Documentation](docs/README.md) · [CLI package](https://www.npmjs.com/package/@10signals/cli)
+[Use Cloud](https://10signals.xyz/) · [Documentation](docs/README.md)
 
 ## Cloud or self-hosted?
 
@@ -57,7 +57,6 @@ See the [installation guide](docs/local-quickstart.md) for updates, backups, por
 ## Learn more
 
 - [Documentation and available options](docs/README.md)
-- [Trigger setup and credentials](docs/trigger-authentication.md)
 - [Connect an AI agent to hosted 10Signals](docs/mcp-connection.md)
 - [Contribute](CONTRIBUTING.md)
 
@@ -68,3 +67,13 @@ The separate `@10signals/cli` package connects to existing Trigger tasks; it is 
 This repository is a reviewed public source distribution. `PUBLIC_SOURCE.json` records the source revision and file hashes. Private Git history, production configuration, and account data are not included.
 
 [Apache-2.0](LICENSE)
+
+## Team Trigger access — approval required
+
+For teammates or agents who need the team's existing Trigger project, request
+access from the 10Signals team administrator first. The team approves the project
+and environment and supplies a runtime key securely. Installing the public CLI
+package does not grant access, create a project or deploy tasks.
+
+Follow [team Trigger setup](docs/trigger-authentication.md) after approval. This
+is separate from self-hosting and external customer API/MCP access.

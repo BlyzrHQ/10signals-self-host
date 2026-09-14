@@ -484,7 +484,7 @@
       "mode": "100644"
     },
     "app/lib/docs-catalog.ts": {
-      "sha256": "ce9c3c7933053fba3ecb16a6c28e42747212b01886c528f7b37126ca4ebb2c8f",
+      "sha256": "030d67806e81d96cf9aa83d69034cc564d5a96f79c16507749a264915d59e05f",
       "mode": "100644"
     },
     "app/lib/domain-recovery.ts": {
@@ -1664,7 +1664,7 @@
       "mode": "100644"
     },
     "tests/team-trigger-docs.test.mjs": {
-      "sha256": "9e0a3a0c06fb5526d96d747d98ca8e343e92b4307dec66a684e02ffb97e14185",
+      "sha256": "b1abdba87d52c19a6b1e1da965aeb97afd9ffad1f057241ba89c780c5eac985f",
       "mode": "100644"
     }
   },
@@ -1695,6 +1695,18 @@
         "package.json",
         "tests/team-trigger-docs.test.mjs",
         "app/cli/page.tsx"
+      ],
+      "documentationUiChanged": true,
+      "researchOrAuthenticationChanged": false,
+      "prebuiltImageChanged": false
+    },
+    {
+      "date": "2026-09-14",
+      "kind": "documentation-navigation-labels",
+      "basePublicCommit": "95b0812420ab0169ca6562936e2d8da30a889475",
+      "files": [
+        "app/lib/docs-catalog.ts",
+        "tests/team-trigger-docs.test.mjs"
       ],
       "documentationUiChanged": true,
       "researchOrAuthenticationChanged": false,

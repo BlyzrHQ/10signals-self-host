@@ -9,13 +9,36 @@ const exports = {};
 new Function("exports", compiled)(exports);
 const { docGuides, docGroups, searchDocGuides } = exports;
 
+test("sidebar categories and destination titles are distinct and concise", () => {
+  assert.deepEqual(docGroups.map(group => group.title), [
+    "Getting started", "10Signals Cloud", "Self-hosting",
+    "Integrations", "Help & reference", "Team access",
+  ]);
+  const normalized = text => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const headings = new Set(docGroups.map(group => normalized(group.title)));
+  const titles = docGuides.map(guide => normalized(guide.title));
+  assert.equal(new Set(titles).size, titles.length);
+  for (const guide of docGuides) {
+    assert.ok(!headings.has(normalized(guide.title)), guide.slug);
+    assert.ok(guide.title.length <= 32, guide.title);
+    const category = docGroups.find(group => group.slugs.includes(guide.slug));
+    assert.notEqual(normalized(category.title), normalized(guide.status), guide.slug);
+  }
+  assert.equal(docGuides.find(guide => guide.slug === "using-10signals").title, "Reports and comparisons");
+  assert.equal(docGuides.find(guide => guide.slug === "hosted").title, "Accounts and reports");
+  assert.equal(docGuides.at(-1).title, "Request project access");
+  assert.ok(searchDocGuides(docGuides, "10Signals Cloud").some(guide => guide.slug === "hosted"));
+});
+
 test("team Trigger setup is last in navigation, directory and the guide list", () => {
   assert.equal(docGroups.at(-1).title, "Team access");
   assert.deepEqual(docGroups.at(-1).slugs, ["trigger-cli", "trigger-credentials", "team-trigger"]);
   assert.equal(docGuides.at(-1).slug, "team-trigger");
   assert.deepEqual(docGuides.map(guide => guide.slug), docGroups.flatMap(group => group.slugs));
   const directory = read("app/docs/docs-client.tsx").split("export function DocsDirectory")[0];
-  assert.ok(directory.lastIndexOf('title: "Team access"') > directory.indexOf('title: "Configuration and help"'));
+  const teamIndex = directory.lastIndexOf('title: "Team access"');
+  const helpIndex = directory.indexOf('title: "Configuration and help"');
+  assert.ok(teamIndex >= 0 && helpIndex >= 0 && teamIndex > helpIndex);
   assert.match(directory, /slugs: \["trigger-cli", "trigger-credentials", "team-trigger"\]/);
   const headings = [...read("docs/README.md").matchAll(/^## (.+)$/gm)];
   assert.match(headings.at(-1)[1], /Team Trigger access/);

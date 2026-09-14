@@ -62,4 +62,8 @@ test("old own-project links redirect while external accounts remain separate", (
   assert.match(read("app/docs/[slug]/page.tsx"), /if \(slug === "own-trigger"\) redirect\("\/docs\/team-trigger"\)/);
   assert.match(docGuides.find(guide => guide.slug === "team-trigger").boundary, /External customers/);
   assert.match(docGuides.find(guide => guide.slug === "mcp").boundary, /No Trigger key is needed/);
+  const landing = read("app/cli/page.tsx");
+  assert.match(landing, /Request team approval before connecting/);
+  assert.match(landing, /href="\/docs\/trigger-cli"/);
+  assert.doesNotMatch(landing, /https:\/\/github.com\/10claws\/market-signal/);
 });

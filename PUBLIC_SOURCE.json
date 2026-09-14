@@ -252,7 +252,7 @@
       "mode": "100644"
     },
     "app/cli/page.tsx": {
-      "sha256": "d76b03741f22006e6fcb09aae09300134f036a168db829fa86b1a64da1a5e754",
+      "sha256": "70b694a126b65327a8b14f95a0fbbf833fcfe3c6130e43aa7f63703ea0907f57",
       "mode": "100644"
     },
     "app/components/account-navigation-link.tsx": {
@@ -1664,7 +1664,7 @@
       "mode": "100644"
     },
     "tests/team-trigger-docs.test.mjs": {
-      "sha256": "a00634a53de8b83ce8c43c5415f01ab52552559dcd955bea26514cd09c5f0a18",
+      "sha256": "9e0a3a0c06fb5526d96d747d98ca8e343e92b4307dec66a684e02ffb97e14185",
       "mode": "100644"
     }
   },
@@ -1693,7 +1693,8 @@
         "docs/release-status.md",
         "docs/trigger-authentication.md",
         "package.json",
-        "tests/team-trigger-docs.test.mjs"
+        "tests/team-trigger-docs.test.mjs",
+        "app/cli/page.tsx"
       ],
       "documentationUiChanged": true,
       "researchOrAuthenticationChanged": false,

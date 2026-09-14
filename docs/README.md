@@ -1,5 +1,8 @@
 # 10Signals documentation
 
+See [release status and updates](release-status.md) before switching branches or
+assuming a source update changes the running image or installed CLI.
+
 Start with the path that matches what you want to do. The running local preview
 has a searchable documentation hub at **http://localhost:8787/docs** (use your
 chosen port if different), with Windows and macOS/bash commands and expected outcomes.

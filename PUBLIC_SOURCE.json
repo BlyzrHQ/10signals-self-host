@@ -4,7 +4,12 @@
   "destination": "10claws/10signals-self-host",
   "sourceRevision": "3e478308128effc4dfead0f84a47bfcee87731e3",
   "status": "self-hosting-preview",
-  "ownerMigration": { "from": "BlyzrHQ", "to": "10claws", "repositoryId": 1367252067, "basePublicCommit": "42b3a29cb3b4951bd2ccf58ea224a6f176b257f1" },
+  "ownerMigration": {
+    "from": "BlyzrHQ",
+    "to": "10claws",
+    "repositoryId": 1367252067,
+    "basePublicCommit": "42b3a29cb3b4951bd2ccf58ea224a6f176b257f1"
+  },
   "files": {
     ".dockerignore": {
       "sha256": "5b663cf36b70faf8dd96509b16723e2d35b933f11a88c3430b0ab2f7fdfbc4b8",
@@ -927,7 +932,7 @@
       "mode": "100644"
     },
     "docs/README.md": {
-      "sha256": "43408a5b799472393d3ee0bff5e52d466c29b5c00d8bd491061e654a2e4b780d",
+      "sha256": "a8a1f84e1141a612c2283d68387bfc69735306b24f387c9ba4a2b8fde3e82e32",
       "mode": "100644"
     },
     "docs/self-hosting.md": {
@@ -1403,7 +1408,7 @@
       "mode": "100644"
     },
     "README.md": {
-      "sha256": "2d5b81e2345719bd82ea1973434db1550d1f544bc62123f0b0775da1f885b569",
+      "sha256": "fadbd58e55ca9380a408a5883b5141b51b3bde2f2bd7db60c908686b2ef11764",
       "mode": "100644"
     },
     "scripts/assert-vps-build.mjs": {
@@ -1653,6 +1658,23 @@
     "vite.config.ts": {
       "sha256": "82fceaaca65dfafadc113a29aecd79497f32cab587a4a86befa21d873018b395",
       "mode": "100644"
+    },
+    "docs/release-status.md": {
+      "sha256": "6dbee42965ed284b3e2df3ce0c5a96b43120802406acefdbbf6a29aeab910987",
+      "mode": "100644"
     }
-  }
+  },
+  "documentationUpdates": [
+    {
+      "date": "2026-09-14",
+      "kind": "documentation-only",
+      "basePublicCommit": "d4e1fec851d3a5d7a5bde3d67669116bf813c7f6",
+      "files": [
+        "README.md",
+        "docs/README.md",
+        "docs/release-status.md"
+      ],
+      "runtimeChanged": false
+    }
+  ]
 }

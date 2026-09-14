@@ -13,6 +13,8 @@ Enter a domain to find product comparisons, competitor prices, and the public so
 
 Self-hosting is currently a **local preview**. It is not ready for a publicly exposed server. Successful research with your valid provider key remains an acceptance test.
 
+See [release status and updates](docs/release-status.md) for the difference between source, the pinned image, and the separate CLI package.
+
 ## Quick start
 
 You need **Git** and **Docker with Compose 2.24+**. Windows PowerShell, macOS Terminal, and Linux use the same commands. No Node.js, npm, or GitHub login is required.

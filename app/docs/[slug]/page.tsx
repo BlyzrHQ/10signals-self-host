@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function GuidePage({ params }: Props) {
   const { slug } = await params;
   if (slug === "local-mcp") redirect("/docs/mcp");
+  if (slug === "own-trigger") redirect("/docs/team-trigger");
   const guide = docGuides.find(g => g.slug === slug);
   if (!guide) notFound();
   const group = docGroups.find(g => g.slugs.includes(slug))!;

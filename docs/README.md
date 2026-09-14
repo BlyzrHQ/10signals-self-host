@@ -1,5 +1,8 @@
 # 10Signals documentation
 
+See [release status and updates](release-status.md) before switching branches or
+assuming a source update changes the running image or installed CLI.
+
 Start with the path that matches what you want to do. The running local preview
 has a searchable documentation hub at **http://localhost:8787/docs** (use your
 chosen port if different), with Windows and macOS/bash commands and expected outcomes.
@@ -18,16 +21,6 @@ chosen port if different), with Windows and macOS/bash commands and expected out
 - [Source-build reference](self-hosting.md): for existing source-build/HTTPS
   installations, not the default quickstart.
 
-## CLI and Trigger
-
-- [Trigger authentication](trigger-authentication.md): runtime key, operator
-  login, CI PAT and worker-provider setup are different things.
-- **Connect the Trigger CLI** in the docs hub: install the public npm client,
-  configure an existing environment, run doctor, then request a report.
-- **Set up your own Trigger project** in the docs hub: release status and
-  acceptance requirements. The isolated installer is **not released** in this
-  public checkout; the npm client does not deploy tasks.
-
 ## API and agents
 
 - **Hosted API** and **Hosted MCP** in the docs hub connect to a customer account
@@ -45,3 +38,20 @@ how to verify the result and what remains untested.
 Preview does not mean production-ready. A connected agent or a valid key does
 not prove a real paid report has completed. Never include keys in issues, chat,
 screenshots or source control.
+
+## Team Trigger access — approval required
+
+This is the final, separate path for authorized teammates and agents who need
+the team's existing Trigger project. It is not a public self-service installation.
+
+1. Ask the 10Signals team administrator to approve your access and confirm the
+   project and environment. The team supplies a runtime key securely; request a
+   dashboard invitation only if you also need to inspect runs.
+2. Follow [team Trigger setup](trigger-authentication.md) to install the CLI on
+   Windows or macOS, enter the key at its hidden prompt and run `doctor`.
+3. Run only the research approved by your team. Task deployment, worker
+   promotion, provider configuration and project access remain with the team.
+
+Installing the npm package or signing in to Trigger does not grant access to
+our project. Cloud, self-hosting and external account API/MCP do not require
+company Trigger credentials.

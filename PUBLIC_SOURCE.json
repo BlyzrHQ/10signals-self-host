@@ -4,7 +4,12 @@
   "destination": "10claws/10signals-self-host",
   "sourceRevision": "3e478308128effc4dfead0f84a47bfcee87731e3",
   "status": "self-hosting-preview",
-  "ownerMigration": { "from": "BlyzrHQ", "to": "10claws", "repositoryId": 1367252067, "basePublicCommit": "42b3a29cb3b4951bd2ccf58ea224a6f176b257f1" },
+  "ownerMigration": {
+    "from": "BlyzrHQ",
+    "to": "10claws",
+    "repositoryId": 1367252067,
+    "basePublicCommit": "42b3a29cb3b4951bd2ccf58ea224a6f176b257f1"
+  },
   "files": {
     ".dockerignore": {
       "sha256": "5b663cf36b70faf8dd96509b16723e2d35b933f11a88c3430b0ab2f7fdfbc4b8",
@@ -247,7 +252,7 @@
       "mode": "100644"
     },
     "app/cli/page.tsx": {
-      "sha256": "d76b03741f22006e6fcb09aae09300134f036a168db829fa86b1a64da1a5e754",
+      "sha256": "70b694a126b65327a8b14f95a0fbbf833fcfe3c6130e43aa7f63703ea0907f57",
       "mode": "100644"
     },
     "app/components/account-navigation-link.tsx": {
@@ -343,11 +348,11 @@
       "mode": "100644"
     },
     "app/docs/[slug]/page.tsx": {
-      "sha256": "09b4bf31a9c0809a826865c384507990d95b509d6a0a7245c3c84adbdd47ecc9",
+      "sha256": "fe0a88ddb1408d22e14cb69843b1b67f930316d34e7a2d7c98a39f95a1310196",
       "mode": "100644"
     },
     "app/docs/docs-client.tsx": {
-      "sha256": "0a73713d72b4b33e90f015ddec4f4fe251a159ea3f3d4cf49d9cd5a9941e44b8",
+      "sha256": "aead00f0357b872e1fed7223939c9048276eb18aee55f87880f04e0996218c42",
       "mode": "100644"
     },
     "app/docs/docs-sidebar.tsx": {
@@ -479,7 +484,7 @@
       "mode": "100644"
     },
     "app/lib/docs-catalog.ts": {
-      "sha256": "2cd3904defd145543273be04d804c69fec73b79cacaa583564041d291483e633",
+      "sha256": "ce9c3c7933053fba3ecb16a6c28e42747212b01886c528f7b37126ca4ebb2c8f",
       "mode": "100644"
     },
     "app/lib/domain-recovery.ts": {
@@ -927,7 +932,7 @@
       "mode": "100644"
     },
     "docs/README.md": {
-      "sha256": "43408a5b799472393d3ee0bff5e52d466c29b5c00d8bd491061e654a2e4b780d",
+      "sha256": "47364448b980ab1417192f361f7a03425f370863c924c7b79034634d765b6d7c",
       "mode": "100644"
     },
     "docs/self-hosting.md": {
@@ -935,7 +940,7 @@
       "mode": "100644"
     },
     "docs/trigger-authentication.md": {
-      "sha256": "dea7a677a66509af36cb4e230d88c58864247526de68e69e433d829159ce3c86",
+      "sha256": "2f717c249073175a14c10fa897915876fb439d92573f3a4a498f21dc5febb35a",
       "mode": "100644"
     },
     "eslint.config.mjs": {
@@ -955,7 +960,7 @@
       "mode": "100644"
     },
     "package.json": {
-      "sha256": "acdc99b8886dec0e99b7042eebd78ce408e45287f69ffeaa568b8ac4e07dadc3",
+      "sha256": "10c371819cb0806d42afd9ea3ba194e2e620323a5550b027ed11a8d7f1020956",
       "mode": "100644"
     },
     "postcss.config.mjs": {
@@ -1403,7 +1408,7 @@
       "mode": "100644"
     },
     "README.md": {
-      "sha256": "2d5b81e2345719bd82ea1973434db1550d1f544bc62123f0b0775da1f885b569",
+      "sha256": "ad2283ee8c81839eb0c555f9efa4ae753a09c96bdd3b0b62dbb1008c374bdde4",
       "mode": "100644"
     },
     "scripts/assert-vps-build.mjs": {
@@ -1653,6 +1658,47 @@
     "vite.config.ts": {
       "sha256": "82fceaaca65dfafadc113a29aecd79497f32cab587a4a86befa21d873018b395",
       "mode": "100644"
+    },
+    "docs/release-status.md": {
+      "sha256": "88b4ccf8a3f0e4aaa608194f2f0d82e1e08d91b0c3c91ec686b134872c385d4b",
+      "mode": "100644"
+    },
+    "tests/team-trigger-docs.test.mjs": {
+      "sha256": "9e0a3a0c06fb5526d96d747d98ca8e343e92b4307dec66a684e02ffb97e14185",
+      "mode": "100644"
     }
-  }
+  },
+  "documentationUpdates": [
+    {
+      "date": "2026-09-14",
+      "kind": "documentation-only",
+      "basePublicCommit": "d4e1fec851d3a5d7a5bde3d67669116bf813c7f6",
+      "files": [
+        "README.md",
+        "docs/README.md",
+        "docs/release-status.md"
+      ],
+      "runtimeChanged": false
+    },
+    {
+      "date": "2026-09-14",
+      "kind": "documentation-ui-and-tests",
+      "basePublicCommit": "77467586c0990390d5751ba21052e6496448a36e",
+      "files": [
+        "README.md",
+        "app/docs/[slug]/page.tsx",
+        "app/docs/docs-client.tsx",
+        "app/lib/docs-catalog.ts",
+        "docs/README.md",
+        "docs/release-status.md",
+        "docs/trigger-authentication.md",
+        "package.json",
+        "tests/team-trigger-docs.test.mjs",
+        "app/cli/page.tsx"
+      ],
+      "documentationUiChanged": true,
+      "researchOrAuthenticationChanged": false,
+      "prebuiltImageChanged": false
+    }
+  ]
 }
